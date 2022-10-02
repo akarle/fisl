@@ -1,28 +1,31 @@
 #!/usr/bin/chicken-csi -ss
 ;; fisl -- fisl is scheme lox
+(load "scanner.scm")
+(load "util.scm")
+
 (import (chicken io)
 	(chicken base)
-	(chicken format))
+	(chicken format)
+	scanner
+	util)
 
-(define (run code)
-  (print code))
+(define (run code fname)
+  (let ((exit-code 0))
+    (print (scan code fname))
+    exit-code))
 
 (define (run-prompt)
   (display "> ")
   (let ((l (read-line)))
     (if (not (eof-object? l))
       (begin
-	(run l)
+	(run l "repl")
 	(run-prompt))
       (exit 0))))
 
 (define (run-file fname)
   (call-with-input-file fname (lambda (p)
-     (run (read-string #f p)))))
-
-(define (die str)
-  (fprintf (current-error-port) "~A\n" str)
-  (exit 1))
+     (exit (run (read-string #f p) fname)))))
 
 (define (main args)
   (let ((argc (length args)))

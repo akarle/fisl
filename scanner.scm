@@ -74,8 +74,12 @@
         ; helper to tokenize current span
         (tok-range type s i))
 
-      (define (next l2)
-        ; Helper to iterate while keeping state
+      (define (skip)
+        ; Helper to skip this character range
+        (get-tokens (add1 i) (add1 i) line in))
+
+      (define (advance l2)
+        ; Helper to iterate; keeps start but increments range
         (get-tokens s (add1 i) l2 in))
 
       (let ((c (peek i)))
@@ -84,25 +88,25 @@
           (cond
             ((eq? in 'comment) (if (or (not c) (eq? #\newline c))
                                  (get-tokens (add1 i) (add1 i) (add1 line) #f)
-                                 (next line)))
+                                 (advance line)))
             ((eq? in 'string)
              (cond
                ((not c) (err (format "~A:~A:unterminated string" fname line)))
                ((eq? #\" c) (tok 'STRING))
-               ((eq? #\newline c) (next (add1 line)))
-               (else (next line))))
+               ((eq? #\newline c) (advance (add1 line)))
+               (else (advance line))))
             ((eq? in 'number)
              (cond
-               ((digit? c) (next line))
+               ((digit? c) (advance line))
                ((eq? #\. c) (get-tokens s (add1 i) line 'decimal))
                (else (tok-range 'NUMBER s (sub1 i)))))
             ((eq? in 'decimal)
              (cond
-               ((digit? c) (next line))
+               ((digit? c) (advance line))
                (else (tok-range 'NUMBER s (sub1 i)))))
             ((eq? in 'alpha)
              (cond
-               ((alnum? c) (next line))
+               ((alnum? c) (advance line))
                (else (tok-range 'IDENTIFIER s (sub1 i)))))
             ((eq? in '=) (if (eq? #\= c) (tok 'EQUAL_EQUAL) (tok 'EQUAL)))
             ((eq? in '>) (if (eq? #\> c) (tok 'GREATER_EQUAL) (tok 'GREATER)))
@@ -128,10 +132,10 @@
                     ((eq? #\" c) (get-tokens s (add1 i) line 'string))
                     ((digit? c) (get-tokens s (add1 i) line 'number))
                     ((alpha? c) (get-tokens s (add1 i) line 'alpha))
-                    ((eq? #\space c) (get-tokens (add1 i) (add1 i) line #f))
-                    ((eq? #\tab c) (get-tokens (add1 i) (add1 i) line #f))
-                    ((eq? #\newline c) (get-tokens (add1 i) (add1 i) (add1 line) #f))
-                    (else (err (format "~A:~A:unexpected character: ~A" fname 0 c)) #f)))))))
+                    ((eq? #\space c) (skip))
+                    ((eq? #\tab c) (skip))
+                    ((eq? #\newline c) (skip))
+                    (else (err (format "~A:~A:unexpected character: ~A" fname 0 c)) (skip))))))))
 
     (get-tokens 0 0 1 #f))
   ) ; end of module

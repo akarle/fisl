@@ -39,10 +39,10 @@
             (get-tokens (add1 i2) (add1 i2) line #f)))
 
     (let ((c (peek i)))
-      (if (not c)
+      (if (and (not in) (not c))
         (list (make-token 'EOF "" #f line))
         (cond
-          ((eq? in 'comment) (if (eq? #\newline c)
+          ((eq? in 'comment) (if (or (not c) (eq? #\newline c))
                                  (get-tokens (add1 i) (add1 i) (add1 line) #f)
                                  (get-tokens s (add1 i) line 'comment)))
           ((eq? in 'string) #f)

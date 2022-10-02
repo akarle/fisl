@@ -11,7 +11,7 @@
 
 (define (run code fname)
   (let ((exit-code 0))
-    (print (scan code fname))
+    (map print (scan code fname))
     exit-code))
 
 (define (run-prompt)

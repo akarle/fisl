@@ -13,6 +13,9 @@
     (literal ,literal)
     (line ,line)))
 
+(define (is-digit c)
+  (and (char<=? #\0 c) (char>=? #\9 c)))
+
 (define (scan src fname)
   (define (peek i)
     ; safe string-ref
@@ -20,23 +23,15 @@
       (string-ref src i)
       #f))
 
-  ; CI stores state as the pointer location, which works great
-  ; in a language that is prepared to update state within the
-  ; branches of the switch statement.
-  ;
-  ; Given that we're using recursion to loop over the characters,
-  ; it is an easier model to conceptualize the state of the
-  ; interpreter being instead what special tokens of arbitrary
-  ; length we might be in (as well as the pointer).
-
-
-
   (define (get-tokens s i line in)
     ; Gets all tokens after 'start', tracks state in i (current char), line, in
     (define (tok type s2 i2)
       ; Helper to make a token, cons it to our list, and recurse with fresh state
       (let ((tok (cond
                   ((eq? type 'STRING) (make-token type (substring src (add1 s2) i2) #f line))
+                  ((eq? type 'NUMBER) (make-token type
+                                                  (string->number (substring src s2 (add1 i2)))
+                                                  #f line))
                   (else (make-token type (substring src s2 (add1 i2)) #f line)))))
         (cons tok (get-tokens (add1 i2) (add1 i2) line #f))))
 
@@ -57,7 +52,15 @@
              ((eq? #\" c) (tok 'STRING s i))
              ((eq? #\newline c) (next (add1 line)))
              (else (next line))))
-          ((eq? in 'number) #f)
+          ((eq? in 'number)
+           (cond
+             ((is-digit c) (next line))
+             ((eq? #\. c) (get-tokens s (add1 i) line 'decimal))
+             (else (tok 'NUMBER s (sub1 i)))))
+          ((eq? in 'decimal)
+           (cond
+             ((is-digit c) (next line))
+             (else (tok 'NUMBER s (sub1 i)))))
           ((eq? in 'identifier) #f)
           ((eq? in '=) (if (eq? #\= c) (tok 'EQUAL_EQUAL s i) (tok 'EQUAL s s)))
           ((eq? in '>) (if (eq? #\> c) (tok 'GREATER_EQUAL s i) (tok 'GREATER s s)))
@@ -81,6 +84,7 @@
                   ((eq? #\> c) (get-tokens s (add1 i) line '>))
                   ((eq? #\/ c) (get-tokens s (add1 i) line '/))
                   ((eq? #\" c) (get-tokens s (add1 i) line 'string))
+                  ((is-digit c) (get-tokens s (add1 i) line 'number))
                   ((eq? #\space c) (get-tokens (add1 i) (add1 i) line #f))
                   ((eq? #\tab c) (get-tokens (add1 i) (add1 i) line #f))
                   ((eq? #\newline c) (get-tokens (add1 i) (add1 i) (add1 line) #f))

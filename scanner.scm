@@ -56,7 +56,7 @@
 
     (define (get-tokens s i line in)
       ; Gets all tokens after 'start', tracks state in i (current char), line, in
-      (define (tok type s2 i2)
+      (define (tok-range type s2 i2)
         ; Helper to make a token, cons it to our list, and recurse with fresh state
         (let ((text (substring src s2 (add1 i2))))
           (let ((tok (cond
@@ -70,9 +70,9 @@
                        (else (make-token type text #f line)))))
             (cons tok (get-tokens (add1 i2) (add1 i2) line #f)))))
 
-      (define (tok-1 type)
-        ; helper for length 1 tokens at current position
-        (tok type s s))
+      (define (tok type)
+        ; helper to tokenize current span
+        (tok-range type s i))
 
       (define (next l2)
         ; Helper to iterate while keeping state
@@ -88,38 +88,38 @@
             ((eq? in 'string)
              (cond
                ((not c) (err (format "~A:~A:unterminated string" fname line)))
-               ((eq? #\" c) (tok 'STRING s i))
+               ((eq? #\" c) (tok 'STRING))
                ((eq? #\newline c) (next (add1 line)))
                (else (next line))))
             ((eq? in 'number)
              (cond
                ((digit? c) (next line))
                ((eq? #\. c) (get-tokens s (add1 i) line 'decimal))
-               (else (tok 'NUMBER s (sub1 i)))))
+               (else (tok-range 'NUMBER s (sub1 i)))))
             ((eq? in 'decimal)
              (cond
                ((digit? c) (next line))
-               (else (tok 'NUMBER s (sub1 i)))))
+               (else (tok-range 'NUMBER s (sub1 i)))))
             ((eq? in 'alpha)
              (cond
                ((alnum? c) (next line))
-               (else (tok 'IDENTIFIER s (sub1 i)))))
-            ((eq? in '=) (if (eq? #\= c) (tok 'EQUAL_EQUAL s i) (tok-1 'EQUAL)))
-            ((eq? in '>) (if (eq? #\> c) (tok 'GREATER_EQUAL s i) (tok-1 'GREATER)))
-            ((eq? in '<) (if (eq? #\< c) (tok 'LESS_EQUAL s i) (tok-1 'LESS)))
-            ((eq? in '!) (if (eq? #\= c) (tok 'BANG_EQUAL s i) (tok-1 'BANG)))
-            ((eq? in '/) (if (eq? #\/ c) (get-tokens s (add1 i) line 'comment) (tok-1 'SLASH)))
+               (else (tok-range 'IDENTIFIER s (sub1 i)))))
+            ((eq? in '=) (if (eq? #\= c) (tok 'EQUAL_EQUAL) (tok 'EQUAL)))
+            ((eq? in '>) (if (eq? #\> c) (tok 'GREATER_EQUAL) (tok 'GREATER)))
+            ((eq? in '<) (if (eq? #\< c) (tok 'LESS_EQUAL) (tok 'LESS)))
+            ((eq? in '!) (if (eq? #\= c) (tok 'BANG_EQUAL) (tok 'BANG)))
+            ((eq? in '/) (if (eq? #\/ c) (get-tokens s (add1 i) line 'comment) (tok 'SLASH)))
             (else (cond
-                    ((eq? #\( c) (tok-1 'LEFT_PAREN))
-                    ((eq? #\) c) (tok-1 'RIGHT_PAREN))
-                    ((eq? #\{ c) (tok-1 'LEFT_BRACE))
-                    ((eq? #\} c) (tok-1 'RIGHT_BRACE))
-                    ((eq? #\, c) (tok-1 'COMMA))
-                    ((eq? #\. c) (tok-1 'DOT))
-                    ((eq? #\- c) (tok-1 'MINUS))
-                    ((eq? #\+ c) (tok-1 'PLUS))
-                    ((eq? #\; c) (tok-1 'SEMICOLON))
-                    ((eq? #\* c) (tok-1 'STAR))
+                    ((eq? #\( c) (tok 'LEFT_PAREN))
+                    ((eq? #\) c) (tok 'RIGHT_PAREN))
+                    ((eq? #\{ c) (tok 'LEFT_BRACE))
+                    ((eq? #\} c) (tok 'RIGHT_BRACE))
+                    ((eq? #\, c) (tok 'COMMA))
+                    ((eq? #\. c) (tok 'DOT))
+                    ((eq? #\- c) (tok 'MINUS))
+                    ((eq? #\+ c) (tok 'PLUS))
+                    ((eq? #\; c) (tok 'SEMICOLON))
+                    ((eq? #\* c) (tok 'STAR))
                     ((eq? #\! c) (get-tokens s (add1 i) line '!))
                     ((eq? #\= c) (get-tokens s (add1 i) line '=))
                     ((eq? #\< c) (get-tokens s (add1 i) line '<))

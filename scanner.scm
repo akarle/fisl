@@ -13,10 +13,10 @@
       (literal ,literal)
       (line ,line)))
 
-  (define (is-digit c)
+  (define (digit? c)
     (and c (char<=? #\0 c) (char>=? #\9 c)))
 
-  (define (is-alpha c)
+  (define (alpha? c)
     (and c
          (or
            (eq? c #\_)
@@ -44,8 +44,8 @@
 
 
 
-  (define (is-alnum c)
-    (and c (or (is-alpha c) (is-digit c))))
+  (define (alnum? c)
+    (and c (or (alpha? c) (digit? c))))
 
   (define (scan src fname)
     (define (peek i)
@@ -70,6 +70,10 @@
                        (else (make-token type text #f line)))))
             (cons tok (get-tokens (add1 i2) (add1 i2) line #f)))))
 
+      (define (tok-1 type)
+        ; helper for length 1 tokens at current position
+        (tok type s s))
+
       (define (next l2)
         ; Helper to iterate while keeping state
         (get-tokens s (add1 i) l2 in))
@@ -89,41 +93,41 @@
                (else (next line))))
             ((eq? in 'number)
              (cond
-               ((is-digit c) (next line))
+               ((digit? c) (next line))
                ((eq? #\. c) (get-tokens s (add1 i) line 'decimal))
                (else (tok 'NUMBER s (sub1 i)))))
             ((eq? in 'decimal)
              (cond
-               ((is-digit c) (next line))
+               ((digit? c) (next line))
                (else (tok 'NUMBER s (sub1 i)))))
             ((eq? in 'alpha)
              (cond
-               ((is-alnum c) (next line))
+               ((alnum? c) (next line))
                (else (tok 'IDENTIFIER s (sub1 i)))))
-            ((eq? in '=) (if (eq? #\= c) (tok 'EQUAL_EQUAL s i) (tok 'EQUAL s s)))
-            ((eq? in '>) (if (eq? #\> c) (tok 'GREATER_EQUAL s i) (tok 'GREATER s s)))
-            ((eq? in '<) (if (eq? #\< c) (tok 'LESS_EQUAL s i) (tok 'LESS s s)))
-            ((eq? in '!) (if (eq? #\= c) (tok 'BANG_EQUAL s i) (tok 'BANG s s)))
-            ((eq? in '/) (if (eq? #\/ c) (get-tokens s (add1 i) line 'comment) (tok 'SLASH s s)))
+            ((eq? in '=) (if (eq? #\= c) (tok 'EQUAL_EQUAL s i) (tok-1 'EQUAL)))
+            ((eq? in '>) (if (eq? #\> c) (tok 'GREATER_EQUAL s i) (tok-1 'GREATER)))
+            ((eq? in '<) (if (eq? #\< c) (tok 'LESS_EQUAL s i) (tok-1 'LESS)))
+            ((eq? in '!) (if (eq? #\= c) (tok 'BANG_EQUAL s i) (tok-1 'BANG)))
+            ((eq? in '/) (if (eq? #\/ c) (get-tokens s (add1 i) line 'comment) (tok-1 'SLASH)))
             (else (cond
-                    ((eq? #\( c) (tok 'LEFT_PAREN s s))
-                    ((eq? #\) c) (tok 'RIGHT_PAREN s s))
-                    ((eq? #\{ c) (tok 'LEFT_BRACE s s))
-                    ((eq? #\} c) (tok 'RIGHT_BRACE s s))
-                    ((eq? #\, c) (tok 'COMMA s s))
-                    ((eq? #\. c) (tok 'DOT s s))
-                    ((eq? #\- c) (tok 'MINUS s s))
-                    ((eq? #\+ c) (tok 'PLUS s s))
-                    ((eq? #\; c) (tok 'SEMICOLON s s))
-                    ((eq? #\* c) (tok 'STAR s s))
+                    ((eq? #\( c) (tok-1 'LEFT_PAREN))
+                    ((eq? #\) c) (tok-1 'RIGHT_PAREN))
+                    ((eq? #\{ c) (tok-1 'LEFT_BRACE))
+                    ((eq? #\} c) (tok-1 'RIGHT_BRACE))
+                    ((eq? #\, c) (tok-1 'COMMA))
+                    ((eq? #\. c) (tok-1 'DOT))
+                    ((eq? #\- c) (tok-1 'MINUS))
+                    ((eq? #\+ c) (tok-1 'PLUS))
+                    ((eq? #\; c) (tok-1 'SEMICOLON))
+                    ((eq? #\* c) (tok-1 'STAR))
                     ((eq? #\! c) (get-tokens s (add1 i) line '!))
                     ((eq? #\= c) (get-tokens s (add1 i) line '=))
                     ((eq? #\< c) (get-tokens s (add1 i) line '<))
                     ((eq? #\> c) (get-tokens s (add1 i) line '>))
                     ((eq? #\/ c) (get-tokens s (add1 i) line '/))
                     ((eq? #\" c) (get-tokens s (add1 i) line 'string))
-                    ((is-digit c) (get-tokens s (add1 i) line 'number))
-                    ((is-alpha c) (get-tokens s (add1 i) line 'alpha))
+                    ((digit? c) (get-tokens s (add1 i) line 'number))
+                    ((alpha? c) (get-tokens s (add1 i) line 'alpha))
                     ((eq? #\space c) (get-tokens (add1 i) (add1 i) line #f))
                     ((eq? #\tab c) (get-tokens (add1 i) (add1 i) line #f))
                     ((eq? #\newline c) (get-tokens (add1 i) (add1 i) (add1 line) #f))

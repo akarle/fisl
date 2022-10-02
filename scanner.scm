@@ -14,7 +14,38 @@
     (line ,line)))
 
 (define (is-digit c)
-  (and (char<=? #\0 c) (char>=? #\9 c)))
+  (and c (char<=? #\0 c) (char>=? #\9 c)))
+
+(define (is-alpha c)
+  (and c
+    (or
+      (eq? c #\_)
+      (and (char<=? #\a c) (char>=? #\z c))
+      (and (char<=? #\A c) (char>=? #\Z c)))))
+
+(define (get-keyword k)
+  (let ((kpair (assoc k '(("and"    AND)
+                       ("class"  CLASS)
+                       ("else"   ELSE)
+                       ("false"  FALSE)
+                       ("for"    FOR)
+                       ("fun"    FUN)
+                       ("if"     IF)
+                       ("nil"    NIL)
+                       ("or"     OR)
+                       ("print"  PRINT)
+                       ("return" RETURN)
+                       ("super"  SUPER)
+                       ("this"   THIS)
+                       ("true"   TRUE)
+                       ("var"    VAR)
+                       ("while"  WHILE)))))
+    (if kpair (cadr kpair) #f)))
+
+
+
+(define (is-alnum c)
+  (and c (or (is-alpha c) (is-digit c))))
 
 (define (scan src fname)
   (define (peek i)
@@ -27,13 +58,17 @@
     ; Gets all tokens after 'start', tracks state in i (current char), line, in
     (define (tok type s2 i2)
       ; Helper to make a token, cons it to our list, and recurse with fresh state
-      (let ((tok (cond
-                  ((eq? type 'STRING) (make-token type (substring src (add1 s2) i2) #f line))
-                  ((eq? type 'NUMBER) (make-token type
-                                                  (string->number (substring src s2 (add1 i2)))
-                                                  #f line))
-                  (else (make-token type (substring src s2 (add1 i2)) #f line)))))
-        (cons tok (get-tokens (add1 i2) (add1 i2) line #f))))
+      (let ((text (substring src s2 (add1 i2))))
+        (let ((tok (cond
+                    ((eq? type 'STRING) (make-token type text (substring src (add1 s2) i2) line))
+                    ((eq? type 'NUMBER) (make-token type text (string->number text) line))
+                    ((eq? type 'IDENTIFIER)
+                     (let ((k (get-keyword text)))
+                       (if k
+                         (make-token k text #f line)
+                         (make-token 'IDENTIFIER text #f line))))
+                    (else (make-token type text #f line)))))
+        (cons tok (get-tokens (add1 i2) (add1 i2) line #f)))))
 
     (define (next l2)
       ; Helper to iterate while keeping state
@@ -61,7 +96,10 @@
            (cond
              ((is-digit c) (next line))
              (else (tok 'NUMBER s (sub1 i)))))
-          ((eq? in 'identifier) #f)
+          ((eq? in 'alpha)
+           (cond
+             ((is-alnum c) (next line))
+             (else (tok 'IDENTIFIER s (sub1 i)))))
           ((eq? in '=) (if (eq? #\= c) (tok 'EQUAL_EQUAL s i) (tok 'EQUAL s s)))
           ((eq? in '>) (if (eq? #\> c) (tok 'GREATER_EQUAL s i) (tok 'GREATER s s)))
           ((eq? in '<) (if (eq? #\< c) (tok 'LESS_EQUAL s i) (tok 'LESS s s)))
@@ -85,6 +123,7 @@
                   ((eq? #\/ c) (get-tokens s (add1 i) line '/))
                   ((eq? #\" c) (get-tokens s (add1 i) line 'string))
                   ((is-digit c) (get-tokens s (add1 i) line 'number))
+                  ((is-alpha c) (get-tokens s (add1 i) line 'alpha))
                   ((eq? #\space c) (get-tokens (add1 i) (add1 i) line #f))
                   ((eq? #\tab c) (get-tokens (add1 i) (add1 i) line #f))
                   ((eq? #\newline c) (get-tokens (add1 i) (add1 i) (add1 line) #f))

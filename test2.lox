@@ -1,0 +1,4 @@
+foo = 5;
+while (foo != 0) {
+	print foo;
+}

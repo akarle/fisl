@@ -4,10 +4,10 @@
 (load "util.scm")
 
 (import (chicken io)
-	(chicken base)
-	(chicken format)
-	scanner
-	util)
+        (chicken base)
+        (chicken format)
+        scanner
+        util)
 
 (define (run code fname)
   (let ((exit-code 0))
@@ -19,13 +19,13 @@
   (let ((l (read-line)))
     (if (not (eof-object? l))
       (begin
-	(run l "repl")
-	(run-prompt))
+        (run l "repl")
+        (run-prompt))
       (exit 0))))
 
 (define (run-file fname)
   (call-with-input-file fname (lambda (p)
-     (exit (run (read-string #f p) fname)))))
+                                (exit (run (read-string #f p) fname)))))
 
 (define (main args)
   (let ((argc (length args)))

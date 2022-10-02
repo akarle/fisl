@@ -1,18 +1,17 @@
 (load "util.scm")
 
-(module scanner (scan make-token)
+(module scanner (scan)
 
 (import scheme
         util
         (chicken base)
         (chicken format))
 
-(define (make-token type lexeme literal line len)
+(define (make-token type lexeme literal line)
   `((type ,type)
     (lexeme ,lexeme)
     (literal ,literal)
-    (line ,line)
-    (len ,len)))
+    (line ,line)))
 
 (define (scan src fname)
   (define (peek i)
@@ -30,45 +29,50 @@
   ; interpreter being instead what special tokens of arbitrary
   ; length we might be in (as well as the pointer).
 
-  (define (get-tokens start line)
-    ; Gets all tokens after start
 
-    (let loop ((i start) (nline line) (in-comment #f) (in-string #f) (in-number #f) (in-identifier #f))
-      (define (tok type len)
-        ; helper to make a token and recurse -- todo is redefining slow? macro?
-        (cons (make-token type (substring src i (+ i len)) #f nline len)
-              (get-tokens (+ i len) nline)))
-      (let ((c (peek i)) (n (peek (add1 i))))
-        ;(printf "c: ~A, n: ~A, i: ~A, com: ~A\n" c n i in-comment)
-        (if (not c)
-          (list (make-token 'EOF "" #f line 0))
-          (cond
-            (in-comment (if (eq? #\newline c)
-                          (loop (add1 i) (add1 nline) #f #f #f #f)
-                          (loop (add1 i) nline #t #f #f #f)))
-            (in-string #f)
-            (in-number #f)
-            (in-identifier #f)
-            (else (cond
-                    ((eq? #\( c) (tok 'LEFT_PAREN 1))
-                    ((eq? #\) c) (tok 'RIGHT_PAREN 1))
-                    ((eq? #\{ c) (tok 'LEFT_BRACE 1))
-                    ((eq? #\} c) (tok 'RIGHT_BRACE 1))
-                    ((eq? #\, c) (tok 'COMMA 1))
-                    ((eq? #\. c) (tok 'DOT 1))
-                    ((eq? #\- c) (tok 'MINUS 1))
-                    ((eq? #\+ c) (tok 'PLUS 1))
-                    ((eq? #\; c) (tok 'SEMICOLON 1))
-                    ((eq? #\* c) (tok 'STAR 1))
-                    ((eq? #\! c) (if (eq? #\= n) (tok 'BANG_EQUAL 2) (tok 'BANG 1)))
-                    ((eq? #\= c) (if (eq? #\= n) (tok 'EQUAL_EQUAL 2) (tok 'EQUAL 1)))
-                    ((eq? #\< c) (if (eq? #\< n) (tok 'LESS_EQUAL 2) (tok 'LESS 1)))
-                    ((eq? #\> c) (if (eq? #\> n) (tok 'GREATER_EQUAL 2) (tok 'GREATER 1)))
-                    ((eq? #\/ c) (if (eq? #\/ n) (loop (add1 i) nline #t #f #f #f) (tok 'SLASH 1)))
-                    ((eq? #\space c) (loop (add1 i) nline #f #f #f #f))
-                    ((eq? #\tab c) (loop (add1 i) nline #f #f #f #f))
-                    ((eq? #\newline c) (loop (add1 i) (add1 nline) #f #f #f #f))
-                    (else (err (format "~A:~A:unexpected character: ~A" fname 0 c)) #f))))))))
 
-  (get-tokens 0 1))
+  (define (get-tokens s i line in)
+    ; Gets all tokens after 'start', tracks state in i (current char), line, in
+    (define (tok type s2 i2)
+      ; Helper to make a token, cons it to our list, and recurse with fresh state
+      (cons (make-token type (substring src s2 (add1 i2)) #f line)
+            (get-tokens (add1 i2) (add1 i2) line #f)))
+
+    (let ((c (peek i)))
+      (if (not c)
+        (list (make-token 'EOF "" #f line))
+        (cond
+          ((eq? in 'comment) (if (eq? #\newline c)
+                                 (get-tokens (add1 i) (add1 i) (add1 line) #f)
+                                 (get-tokens s (add1 i) line 'comment)))
+          ((eq? in 'string) #f)
+          ((eq? in 'number) #f)
+          ((eq? in 'identifier) #f)
+          ((eq? in '=) (if (eq? #\= c) (tok 'EQUAL_EQUAL s i) (tok 'EQUAL s s)))
+          ((eq? in '>) (if (eq? #\> c) (tok 'GREATER_EQUAL s i) (tok 'GREATER s s)))
+          ((eq? in '<) (if (eq? #\< c) (tok 'LESS_EQUAL s i) (tok 'LESS s s)))
+          ((eq? in '!) (if (eq? #\= c) (tok 'BANG_EQUAL s i) (tok 'BANG s s)))
+          ((eq? in '/) (if (eq? #\/ c) (get-tokens s (add1 i) line 'comment) (tok 'SLASH s s)))
+          (else (cond
+                  ((eq? #\( c) (tok 'LEFT_PAREN s s))
+                  ((eq? #\) c) (tok 'RIGHT_PAREN s s))
+                  ((eq? #\{ c) (tok 'LEFT_BRACE s s))
+                  ((eq? #\} c) (tok 'RIGHT_BRACE s s))
+                  ((eq? #\, c) (tok 'COMMA s s))
+                  ((eq? #\. c) (tok 'DOT s s))
+                  ((eq? #\- c) (tok 'MINUS s s))
+                  ((eq? #\+ c) (tok 'PLUS s s))
+                  ((eq? #\; c) (tok 'SEMICOLON s s))
+                  ((eq? #\* c) (tok 'STAR s s))
+                  ((eq? #\! c) (get-tokens s (add1 i) line '!))
+                  ((eq? #\= c) (get-tokens s (add1 i) line '=))
+                  ((eq? #\< c) (get-tokens s (add1 i) line '<))
+                  ((eq? #\> c) (get-tokens s (add1 i) line '>))
+                  ((eq? #\/ c) (get-tokens s (add1 i) line '/))
+                  ((eq? #\space c) (get-tokens (add1 i) (add1 i) line #f))
+                  ((eq? #\tab c) (get-tokens (add1 i) (add1 i) line #f))
+                  ((eq? #\newline c) (get-tokens (add1 i) (add1 i) (add1 line) #f))
+                  (else (err (format "~A:~A:unexpected character: ~A" fname 0 c)) #f)))))))
+
+  (get-tokens 0 0 1 #f))
 ) ; end of module

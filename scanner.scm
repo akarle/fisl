@@ -35,8 +35,14 @@
     ; Gets all tokens after 'start', tracks state in i (current char), line, in
     (define (tok type s2 i2)
       ; Helper to make a token, cons it to our list, and recurse with fresh state
-      (cons (make-token type (substring src s2 (add1 i2)) #f line)
-            (get-tokens (add1 i2) (add1 i2) line #f)))
+      (let ((tok (cond
+                  ((eq? type 'STRING) (make-token type (substring src (add1 s2) i2) #f line))
+                  (else (make-token type (substring src s2 (add1 i2)) #f line)))))
+        (cons tok (get-tokens (add1 i2) (add1 i2) line #f))))
+
+    (define (next l2)
+      ; Helper to iterate while keeping state
+      (get-tokens s (add1 i) l2 in))
 
     (let ((c (peek i)))
       (if (and (not in) (not c))
@@ -44,8 +50,13 @@
         (cond
           ((eq? in 'comment) (if (or (not c) (eq? #\newline c))
                                  (get-tokens (add1 i) (add1 i) (add1 line) #f)
-                                 (get-tokens s (add1 i) line 'comment)))
-          ((eq? in 'string) #f)
+                                 (next line)))
+          ((eq? in 'string)
+           (cond
+             ((not c) (err (format "~A:~A:unterminated string" fname line)))
+             ((eq? #\" c) (tok 'STRING s i))
+             ((eq? #\newline c) (next (add1 line)))
+             (else (next line))))
           ((eq? in 'number) #f)
           ((eq? in 'identifier) #f)
           ((eq? in '=) (if (eq? #\= c) (tok 'EQUAL_EQUAL s i) (tok 'EQUAL s s)))
@@ -69,6 +80,7 @@
                   ((eq? #\< c) (get-tokens s (add1 i) line '<))
                   ((eq? #\> c) (get-tokens s (add1 i) line '>))
                   ((eq? #\/ c) (get-tokens s (add1 i) line '/))
+                  ((eq? #\" c) (get-tokens s (add1 i) line 'string))
                   ((eq? #\space c) (get-tokens (add1 i) (add1 i) line #f))
                   ((eq? #\tab c) (get-tokens (add1 i) (add1 i) line #f))
                   ((eq? #\newline c) (get-tokens (add1 i) (add1 i) (add1 line) #f))

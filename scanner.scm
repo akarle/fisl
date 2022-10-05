@@ -82,7 +82,7 @@
         ; Helper to iterate; keeps start but increments range
         (get-tokens s (add1 i) l2 in))
 
-      (let ((c (peek i)))
+      (let ((c (peek i)) (n (peek (add1 i))))
         (if (and (not in) (not c))
           (list (make-token 'EOF "" #f line))
           (cond
@@ -108,11 +108,6 @@
              (cond
                ((alnum? c) (advance line))
                (else (tok-range 'IDENTIFIER s (sub1 i)))))
-            ((eq? in '=) (if (eq? #\= c) (tok 'EQUAL_EQUAL) (tok 'EQUAL)))
-            ((eq? in '>) (if (eq? #\> c) (tok 'GREATER_EQUAL) (tok 'GREATER)))
-            ((eq? in '<) (if (eq? #\< c) (tok 'LESS_EQUAL) (tok 'LESS)))
-            ((eq? in '!) (if (eq? #\= c) (tok 'BANG_EQUAL) (tok 'BANG)))
-            ((eq? in '/) (if (eq? #\/ c) (get-tokens s (add1 i) line 'comment) (tok 'SLASH)))
             (else (cond
                     ((eq? #\( c) (tok 'LEFT_PAREN))
                     ((eq? #\) c) (tok 'RIGHT_PAREN))
@@ -124,11 +119,11 @@
                     ((eq? #\+ c) (tok 'PLUS))
                     ((eq? #\; c) (tok 'SEMICOLON))
                     ((eq? #\* c) (tok 'STAR))
-                    ((eq? #\! c) (get-tokens s (add1 i) line '!))
-                    ((eq? #\= c) (get-tokens s (add1 i) line '=))
-                    ((eq? #\< c) (get-tokens s (add1 i) line '<))
-                    ((eq? #\> c) (get-tokens s (add1 i) line '>))
-                    ((eq? #\/ c) (get-tokens s (add1 i) line '/))
+                    ((eq? #\! c) (if (eq? #\= n) (tok-range 'BANG_EQUAL s (add1 i)) (tok 'BANG)))
+                    ((eq? #\= c) (if (eq? #\= n) (tok-range 'EQUAL_EQUAL s (add1 i) ) (tok 'EQUAL)))
+                    ((eq? #\< c) (if (eq? #\= n) (tok-range 'LESS_EQUAL s (add1 i) ) (tok 'LESS)))
+                    ((eq? #\> c) (if (eq? #\= n) (tok-range 'GREATER_EQUAL s (add1 i) ) (tok 'GREATER)))
+                    ((eq? #\/ c) (if (eq? #\/ n) (get-tokens s (add1 i) line 'comment) (tok 'SLASH)))
                     ((eq? #\" c) (get-tokens s (add1 i) line 'string))
                     ((digit? c) (get-tokens s (add1 i) line 'number))
                     ((alpha? c) (get-tokens s (add1 i) line 'alpha))

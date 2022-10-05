@@ -1,4 +1,4 @@
-#!/usr/bin/chicken-csi -ss
+#!/usr/local/bin/chicken-csi -ss
 ;; fisl -- fisl is scheme lox
 (load "scanner.scm")
 (load "util.scm")

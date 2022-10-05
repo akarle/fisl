@@ -1,14 +1,20 @@
-(module util (die get err)
+(module util (die get err! had-err clear-err!)
   (import scheme
           (chicken base)
           (chicken io)
           (chicken format))
 
-  (define (err str)
+  (define had-err #f)
+
+  (define (err! str)
+    (set! had-err #t)
     (fprintf (current-error-port) "~A\n" str))
 
+  (define (clear-err!)
+    (set! had-err #f))
+
   (define (die str)
-    (err str)
+    (err! str)
     (exit 1))
 
   (define (get assoc-arr key)

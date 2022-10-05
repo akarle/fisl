@@ -91,7 +91,7 @@
                                  (advance line)))
             ((eq? in 'string)
              (cond
-               ((not c) (err (format "~A:~A:unterminated string" fname line)))
+               ((not c) (err! (format "~A:~A:unterminated string" fname line)))
                ((eq? #\" c) (tok 'STRING))
                ((eq? #\newline c) (advance (add1 line)))
                (else (advance line))))
@@ -129,8 +129,8 @@
                     ((alpha? c) (get-tokens s (add1 i) line 'alpha))
                     ((eq? #\space c) (skip))
                     ((eq? #\tab c) (skip))
-                    ((eq? #\newline c) (skip))
-                    (else (err (format "~A:~A:unexpected character: ~A" fname 0 c)) (skip))))))))
+                    ((eq? #\newline c) (get-tokens (add1 i) (add1 i) (add1 line) in))
+                    (else (err! (format "~A:~A:unexpected character: ~A" fname line c)) (skip))))))))
 
     (get-tokens 0 0 1 #f))
   ) ; end of module

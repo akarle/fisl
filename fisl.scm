@@ -10,9 +10,7 @@
         util)
 
 (define (run code fname)
-  (let ((exit-code 0))
-    (map print (scan code fname))
-    exit-code))
+    (map print (scan code fname)))
 
 (define (run-prompt)
   (display "> ")
@@ -20,12 +18,14 @@
     (if (not (eof-object? l))
       (begin
         (run l "repl")
+        (clear-err!)
         (run-prompt))
       (exit 0))))
 
 (define (run-file fname)
   (call-with-input-file fname (lambda (p)
-                                (exit (run (read-string #f p) fname)))))
+                                (run (read-string #f p) fname)
+                                (exit (if had-err 1 0)))))
 
 (define (main args)
   (let ((argc (length args)))

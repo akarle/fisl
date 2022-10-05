@@ -74,13 +74,13 @@
         ; helper to tokenize current span
         (tok-range type s i))
 
-      (define (skip)
+      (define (skip . line2)
         ; Helper to skip this character range
-        (get-tokens (add1 i) (add1 i) line in))
+        (get-tokens (add1 i) (add1 i) (optional line2 line) in))
 
-      (define (advance l2)
+      (define (advance . line2)
         ; Helper to iterate; keeps start but increments range
-        (get-tokens s (add1 i) l2 in))
+        (get-tokens s (add1 i) (optional line2 line) in))
 
       (let ((c (peek i)) (n (peek (add1 i))))
         (if (and (not in) (not c))
@@ -88,25 +88,25 @@
           (cond
             ((eq? in 'comment) (if (or (not c) (eq? #\newline c))
                                  (get-tokens (add1 i) (add1 i) (add1 line) #f)
-                                 (advance line)))
+                                 (advance)))
             ((eq? in 'string)
              (cond
                ((not c) (err! (format "~A:~A:unterminated string" fname line)))
                ((eq? #\" c) (tok 'STRING))
                ((eq? #\newline c) (advance (add1 line)))
-               (else (advance line))))
+               (else (advance))))
             ((eq? in 'number)
              (cond
-               ((digit? c) (advance line))
+               ((digit? c) (advance))
                ((eq? #\. c) (get-tokens s (add1 i) line 'decimal))
                (else (tok-range 'NUMBER s (sub1 i)))))
             ((eq? in 'decimal)
              (cond
-               ((digit? c) (advance line))
+               ((digit? c) (advance))
                (else (tok-range 'NUMBER s (sub1 i)))))
             ((eq? in 'alpha)
              (cond
-               ((alnum? c) (advance line))
+               ((alnum? c) (advance))
                (else (tok-range 'IDENTIFIER s (sub1 i)))))
             (else (cond
                     ((eq? #\( c) (tok 'LEFT_PAREN))
@@ -129,7 +129,7 @@
                     ((alpha? c) (get-tokens s (add1 i) line 'alpha))
                     ((eq? #\space c) (skip))
                     ((eq? #\tab c) (skip))
-                    ((eq? #\newline c) (get-tokens (add1 i) (add1 i) (add1 line) in))
+                    ((eq? #\newline c) (skip (add1 line)))
                     (else (err! (format "~A:~A:unexpected character: ~A" fname line c)) (skip))))))))
 
     (get-tokens 0 0 1 #f))

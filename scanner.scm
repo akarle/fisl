@@ -7,11 +7,12 @@
           (chicken base)
           (chicken format))
 
-  (define (make-token type lexeme literal line)
-    `((type ,type)
-      (lexeme ,lexeme)
-      (literal ,literal)
-      (line ,line)))
+  ; Auto-generates the scaffolding getters and setters
+  ;   make-token, token-type, set-token-type!, etc
+  (define-record token type lexeme literal line)
+  (set-record-printer! token (lambda (t out)
+    (fprintf out "#,(token type:~S lex:~S lit:~S ln:~S)"
+             (token-type t) (token-lexeme t) (token-literal t) (token-line t))))
 
   (define (digit? c)
     (and c (char<=? #\0 c) (char>=? #\9 c)))
@@ -41,8 +42,6 @@
                             ("var"    VAR)
                             ("while"  WHILE)))))
       (if kpair (cadr kpair) #f)))
-
-
 
   (define (alnum? c)
     (and c (or (alpha? c) (digit? c))))

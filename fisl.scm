@@ -24,8 +24,8 @@
 
 (define (run-file fname)
   (call-with-input-file fname (lambda (p)
-                                (run (read-string #f p) fname)
-                                (exit (if had-err 1 0)))))
+    (run (read-string #f p) fname)
+    (exit (if had-err 1 0)))))
 
 (define (main args)
   (let ((argc (length args)))

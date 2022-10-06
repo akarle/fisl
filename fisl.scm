@@ -2,14 +2,17 @@
 ;; fisl -- fisl is scheme lox
 (load "scanner.scm")
 (load "util.scm")
+(load "parser.scm")
 
 (import (chicken io)
         (chicken base)
         (chicken format)
         scanner
+        parser
         util)
 
 (define (run code fname)
+  (parse)
     (map print (scan code fname)))
 
 (define (run-prompt)

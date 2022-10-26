@@ -1,6 +1,11 @@
 (load "util.scm")
 
-(module scanner (scan)
+(module scanner (scan
+                  make-token
+                  token-type
+                  token-literal
+                  token-lexeme
+                  token-line)
 
   (import scheme
           util

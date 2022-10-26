@@ -12,8 +12,7 @@
         util)
 
 (define (run code fname)
-  (parse)
-    (map print (scan code fname)))
+  (print (parse (scan code fname))))
 
 (define (run-prompt)
   (display "> ")

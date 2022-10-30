@@ -3,16 +3,18 @@
 (load "scanner.scm")
 (load "util.scm")
 (load "parser.scm")
+(load "interpreter.scm")
 
 (import (chicken io)
         (chicken base)
         (chicken format)
         scanner
         parser
+        interpreter
         util)
 
 (define (run code fname)
-  (print (parse (scan code fname) fname)))
+  (print (interpret (parse (scan code fname) fname))))
 
 (define (run-prompt)
   (display "> ")

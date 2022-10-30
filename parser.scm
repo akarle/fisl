@@ -1,4 +1,17 @@
-(module parser (parse)
+(module parser (parse
+                ; TODO: figure out a better way to export these :(
+                ; maybe ditch records?
+                binary?
+                binary-left
+                binary-right
+                binary-operator
+                grouping?
+                grouping-expression
+                literal?
+                literal-value
+                unary?
+                unary-operator
+                unary-right)
 
   (import scheme
           scanner

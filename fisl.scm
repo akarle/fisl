@@ -23,12 +23,11 @@
 (define (run-prompt)
   (display "> ")
   (let ((l (read-line)))
-    (if (not (eof-object? l))
+    (if (not (or (eof-object? l) (equal? l ",q")))
       (begin
         (run l "repl")
         (clear-err!)
-        (run-prompt))
-      (exit 0))))
+        (run-prompt)))))
 
 (define (run-file fname)
   (call-with-input-file fname (lambda (p)
@@ -38,6 +37,6 @@
 (define (main args)
   (let ((argc (length args)))
     (cond
-      ((eq? argc 0) (run-prompt))
+      ((eq? argc 0) (run-prompt) (exit 0))
       ((eq? argc 1) (run-file (car args)))
       (else (die "Too many arguments. Usage: fisl [FILE]")))))

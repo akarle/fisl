@@ -14,7 +14,11 @@
         util)
 
 (define (run code fname)
-  (print (interpret (parse (scan code fname) fname))))
+  (let ((tokens (scan code fname)))
+    (if tokens
+	(let ((expr (parse tokens fname)))
+	  (if expr
+	      (print (interpret expr)))))))
 
 (define (run-prompt)
   (display "> ")

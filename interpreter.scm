@@ -7,6 +7,12 @@
           (chicken base)
           (chicken format))
 
+  (define abort #f)
+
+  (define (runtime-err! msg)
+    (err! msg)
+    (abort #f))
+
   (define (truthy? x)
     (not (or (null? x) (eq? x #f))))
 
@@ -18,12 +24,12 @@
 
   (define (assert-num op x)
     ; TODO: use call/cc to not abort the process
-    (or (number? x) (die (format "Operand must be a number ~A ~A" op x))))
+    (or (number? x) (runtime-err! (format "Operand must be a number ~A ~A" op x))))
 
   (define (assert-nums op x y)
     ; TODO: use call/cc to not abort the process
     (or (and (number? x) (number? y))
-        (die (format "Operands must be numbers ~A ~A ~A" x op y))))
+        (runtime-err! (format "Operands must be numbers ~A ~A ~A" x op y))))
 
   (define (evaluate expr)
     ; TODO: put these on the types themselves? like methods
@@ -39,7 +45,7 @@
            ((MINUS)
             (assert-num op right)
             (- right))
-           (else die (format "Unknown unary op ~A" op)))))
+           (else (runtime-err! (format "Unknown unary op ~A" op))))))
       ((binary? expr)
        (let ((left (evaluate (binary-left expr)))
              (right (evaluate (binary-right expr)))
@@ -66,16 +72,18 @@
             (cond
               ((and (string? left) (string? right)) (string-append left right))
               ((and (number? left) (number? right)) (+ left right))
-              (else (die (format "Bad types for plus ~A" expr)))))
+              (else (runtime-err! (format "Bad types for plus ~A" expr)))))
            ((SLASH)
             (assert-nums op left right)
             (/ left right))
            ((STAR)
             (assert-nums op left right)
             (* left right))
-           (else (die (format "Unknown bin op ~A" op))))))
-      (else (die (format "Unknown expr type ~A" expr)))))
+           (else (runtime-err! (format "Unknown bin op ~A" op))))))
+      (else (runtime-err! (format "Unknown expr type ~A" expr)))))
 
   (define (interpret expr)
-    (evaluate expr))
+    (call/cc (lambda (cc)
+	       (set! abort cc)
+	       (evaluate expr))))
 )

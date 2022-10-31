@@ -19,6 +19,8 @@
           (chicken base)
           (chicken format))
 
+  (define abort #f)
+
   (define-record binary left operator right)
   (set-record-printer! binary
     (lambda (x out) (fprintf out "(~A ~S ~S)"
@@ -54,8 +56,8 @@
                       "Error at"
                       (token-lexeme tok)
                       msg)))
-      ; TODO: synchronize instead of exit
-      (exit 1))
+      ; TODO: synchronize instead of abort
+      (abort #f))
 
     (define (expression expr toks)
       (equality expr toks))
@@ -120,5 +122,7 @@
         (else (panic (car toks) "Unknown token"))))
 
     ;; Actual body of parse!
-    (car (expression '() tokens)))
+    (call/cc (lambda (cc)
+	       (set! abort cc)
+	       (car (expression '() tokens)))))
 )

@@ -16,9 +16,9 @@
 (define (run code fname)
   (let ((tokens (scan code fname)))
     (if tokens
-	(let ((expr (parse tokens fname)))
-	  (if expr
-	      (print (interpret expr)))))))
+	(let ((stmts (parse tokens fname)))
+	  (if stmts
+	      (print (interpret stmts)))))))
 
 (define (run-prompt)
   (display "> ")

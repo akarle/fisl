@@ -1,7 +1,11 @@
 (module parser (parse
                 ; TODO: figure out a better way to export these :(
                 ; maybe ditch records?
-                binary?
+		print-stmt?
+		print-stmt-value
+		expr-stmt?
+		expr-stmt-value
+		binary?
                 binary-left
                 binary-right
                 binary-operator
@@ -42,6 +46,16 @@
                              (token-lexeme (unary-operator x))
                              (unary-right x))))
 
+  (define-record print-stmt value)
+  (set-record-printer! print-stmt
+		       (lambda (x out)
+			 (fprintf out "(print ~A)" (print-stmt-value x))))
+
+  (define-record expr-stmt value)
+  (set-record-printer! expr-stmt
+		       (lambda (x out)
+			 (fprintf out "(expr ~A)" (expr-stmt-value x))))
+
   (define (top-type? tokens types)
     (memq (token-type (car tokens)) types))
 
@@ -58,6 +72,25 @@
                       msg)))
       ; TODO: synchronize instead of abort
       (abort #f))
+
+    (define (statement tokens)
+      (if (top-type? tokens '(PRINT))
+	  (print-statement (cdr tokens))
+	  (expression-statement tokens)))
+
+    (define (print-statement tokens)
+      (let ((ret (expression '() tokens)))
+	(let ((expr (car ret)) (toks (cdr ret)))
+	  (if (top-type? toks '(SEMICOLON))
+	      (cons (make-print-stmt expr) (cdr toks))
+	      (panic (car toks) "expected ;")))))
+
+    (define (expression-statement tokens)
+      (let ((ret (expression '() tokens)))
+	(let ((expr (car ret)) (toks (cdr ret)))
+	  (if (top-type? toks '(SEMICOLON))
+	      (cons (make-expr-stmt expr) (cdr toks))
+	      (panic (car toks) "expected ;")))))
 
     (define (expression expr toks)
       (equality expr toks))
@@ -124,5 +157,9 @@
     ;; Actual body of parse!
     (call/cc (lambda (cc)
 	       (set! abort cc)
-	       (car (expression '() tokens)))))
+	       (let loop ((toks tokens))
+		 (if (not (top-type? toks '(EOF)))
+		     (let ((ret (statement toks)))
+		       (cons (car ret) (loop (cdr ret))))
+		     '())))))
 )

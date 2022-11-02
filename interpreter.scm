@@ -82,8 +82,18 @@
            (else (runtime-err! (format "Unknown bin op ~A" op))))))
       (else (runtime-err! (format "Unknown expr type ~A" expr)))))
 
-  (define (interpret expr)
+  (define (execute stmt)
+    (cond
+     ((print-stmt? stmt)
+      (print (evaluate (print-stmt-value stmt)))
+      '())
+     (else (runtime-err! (format "Unknown stmt ~A" stmt)))))
+
+  (define (interpret stmts)
     (call/cc (lambda (cc)
 	       (set! abort cc)
-	       (evaluate expr))))
+	       (let loop ((sts stmts))
+		 (if (not (null? sts))
+		     (begin (execute (car sts))
+			    (loop (cdr sts))))))))
 )

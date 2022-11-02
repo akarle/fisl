@@ -1,24 +1,20 @@
 #!/usr/local/bin/chicken-csi -ss
 ;; fisl -- fisl is scheme lox
-(load "scanner.scm")
-(load "util.scm")
-(load "parser.scm")
-(load "interpreter.scm")
-
 (import (chicken io)
         (chicken base)
-        (chicken format)
-        scanner
-        parser
-        interpreter
-        util)
+        (chicken format))
+
+(include "util.scm")
+(include "scanner.scm")
+(include "parser.scm")
+(include "interpreter.scm")
 
 (define (run code fname)
   (let ((tokens (scan code fname)))
     (if tokens
 	(let ((stmts (parse tokens fname)))
 	  (if stmts
-	      (print (interpret stmts)))))))
+	      (interpret stmts))))))
 
 (define (run-prompt)
   (display "> ")

@@ -41,6 +41,14 @@
         (hash-table-ref global-env (token-lexeme tok))
         (runtime-err! (format "~Unbound variable ~A at line ~A"
                               (token-lexeme tok) (token-line tok))))))
+   ((assignment? expr)
+    (let ((tok (assignment-name expr)))
+      (if (hash-table-exists? global-env (token-lexeme tok))
+        (begin
+          (hash-table-set! global-env (token-lexeme tok) (assignment-value expr))
+          (assignment-value expr))
+        (runtime-err! (format "Unbound variable ~A at line ~A"
+                              (token-lexeme tok) (token-line tok))))))
    ((unary? expr)
     (let ((right (evaluate (unary-right expr)))
           (op (token-type (unary-operator expr))))

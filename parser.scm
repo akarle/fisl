@@ -26,7 +26,12 @@
 
 (define-record variable name)
 (set-record-printer! variable
-		     (lambda (x out) (fprintf out "~A" (token-lexeme x))))
+		     (lambda (x out) (fprintf out "~A" (token-lexeme (variable-name x)))))
+
+(define-record assignment name value)
+(set-record-printer! assignment
+		     (lambda (x out) (fprintf out "(set! ~A ~A)" (token-lexeme (assignment-name x)) (assignment-value x))))
+
 
 
 (define-record print-stmt value)
@@ -101,7 +106,20 @@
 	    (panic (car toks) "expected ;")))))
 
   (define (expression expr toks)
-    (equality expr toks))
+    (assignment expr toks))
+
+  (define (assignment expr toks)
+    (let* ((ret (equality expr toks))
+           (e2 (car ret))
+           (t2 (cdr ret)))
+      (if (top-type? t2 '(EQUAL))
+        (let* ((ret2 (assignment e2 (cdr t2)))
+               (e3 (car ret2))
+               (t3 (cdr ret2)))
+          (if (variable? e2)
+            (cons (make-assignment (variable-name e2) e3) t3)
+            (begin (err! "Invalid assignment target") (cons e2 t3))))
+        (cons e2 t2))))
 
   (define (equality expr toks)
     ;; (print (format "equality ~S ~S" expr toks))

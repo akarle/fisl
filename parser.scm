@@ -24,6 +24,11 @@
 					      (token-lexeme (unary-operator x))
 					      (unary-right x))))
 
+(define-record variable name)
+(set-record-printer! variable
+		     (lambda (x out) (fprintf out "~A" (token-lexeme x))))
+
+
 (define-record print-stmt value)
 (set-record-printer! print-stmt
 		     (lambda (x out)
@@ -34,11 +39,16 @@
 		     (lambda (x out)
 		       (fprintf out "(expr ~A)" (expr-stmt-value x))))
 
+(define-record var-stmt name init)
+(set-record-printer! var-stmt
+		     (lambda (x out)
+		       (fprintf out "(var ~A ~A)" (var-stmt-name x) (var-stmt-init x))))
+
+
 (define (top-type? tokens types)
   (memq (token-type (car tokens)) types))
 
 (define (parse tokens fname)
-
   (define (panic tok msg)
     (if (eq? (token-type tok) 'EOF)
         (err! (format "~A:~A:~A ~A" fname (token-line tok) "Error at end." msg))
@@ -48,8 +58,28 @@
                       "Error at"
                       (token-lexeme tok)
                       msg)))
-					; TODO: synchronize instead of abort
+    ;; TODO: synchronize instead of abort
     (parser-abort #f))
+
+  (define (declaration tokens)
+    (if (top-type? tokens '(VAR))
+	;; TODO: sync on failure
+	(var-decl (cdr tokens))
+	(statement tokens)))
+
+  (define (var-decl tokens)
+    (if (top-type? tokens '(IDENTIFIER))
+	(let* ((ret
+	       (if (top-type? (cdr tokens) '(EQUAL))
+		   (expression '() (cddr tokens))
+		   (cons '() (cdr tokens))))
+	       (init (car ret))
+	       (toks (cdr ret)))
+	  (if (top-type? toks '(SEMICOLON))
+	      (cons (make-var-stmt (car tokens) init)
+		    (cdr toks))
+	      (panic (car toks) "Expected ';' after variable declaration")))
+	(panic (car tokens) "expected variable name")))
 
   (define (statement tokens)
     (if (top-type? tokens '(PRINT))
@@ -74,7 +104,7 @@
     (equality expr toks))
 
   (define (equality expr toks)
-					; (print (format "equality ~S ~S" expr toks))
+    ;; (print (format "equality ~S ~S" expr toks))
     (let ((ret (comparison expr toks)))
       (let loop ((e (car ret)) (ts (cdr ret)))
         (if (top-type? ts '(BANG_EQUAL EQUAL_EQUAL))
@@ -83,7 +113,7 @@
             (cons e ts)))))
 
   (define (comparison expr toks)
-					; (print (format "comparison ~S ~S" expr toks))
+    ;; (print (format "comparison ~S ~S" expr toks))
     (let ((ret (term expr toks)))
       (let loop ((e (car ret)) (ts (cdr ret)))
         (if (top-type? ts '(GREATER GREATER_EQUAL LESS LESS_EQUAL))
@@ -92,7 +122,7 @@
             (cons e ts)))))
 
   (define (term expr toks)
-					; (print (format "term ~S ~S" expr toks))
+    ;; (print (format "term ~S ~S" expr toks))
     (let ((ret (factor expr toks)))
       (let loop ((e (car ret)) (ts (cdr ret)))
         (if (top-type? ts '(MINUS PLUS))
@@ -101,7 +131,7 @@
             (cons e ts)))))
 
   (define (factor expr toks)
-					; (print (format "factor ~S ~S" expr toks))
+    ;; (print (format "factor ~S ~S" expr toks))
     (let ((ret (unary expr toks)))
       (let loop ((e (car ret)) (ts (cdr ret)))
         (if (top-type? ts '(SLASH STAR))
@@ -110,21 +140,21 @@
             (cons e ts)))))
 
   (define (unary expr toks)
-					; (print (format "unary ~S ~S" expr toks))
+    ;; (print (format "unary ~S ~S" expr toks))
     (if (top-type? toks '(BANG MINUS))
         (let ((ret (unary expr (cdr toks))))
           (cons (make-unary (car toks) (car ret)) (cdr ret)))
         (primary expr toks)))
 
   (define (primary expr toks)
-					; (print (format "primary ~S ~S" expr toks))
+    ;; (print (format "primary ~S ~S" expr toks))
     (cond
      ((top-type? toks '(FALSE)) (cons (make-literal #f) (cdr toks)))
      ((top-type? toks '(TRUE)) (cons (make-literal #t) (cdr toks)))
-					; XXX: nil vs false?
      ((top-type? toks '(NIL)) (cons (make-literal '()) (cdr toks)))
      ((top-type? toks '(NUMBER STRING))
       (cons (make-literal (token-literal (car toks))) (cdr toks)))
+     ((top-type? toks '(IDENTIFIER)) (cons (make-variable (car toks)) (cdr toks)))
      ((top-type? toks '(LEFT_PAREN))
       (let ((ret (expression expr (cdr toks))))
         (if (eq? (token-type (cadr ret)) 'RIGHT_PAREN)
@@ -137,6 +167,6 @@
 	     (set! parser-abort cc)
 	     (let loop ((toks tokens))
 	       (if (not (top-type? toks '(EOF)))
-		   (let ((ret (statement toks)))
+		   (let ((ret (declaration toks)))
 		     (cons (car ret) (loop (cdr ret))))
 		   '())))))

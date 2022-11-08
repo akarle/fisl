@@ -1,7 +1,11 @@
 ;; interpreter.scm -- evaluates parsed statements
-(import (chicken format))
+(import
+  srfi-69 ; hash-tables
+  (chicken format))
 
 (define interpreter-abort #f)
+
+(define global-env (make-hash-table))
 
 (define (runtime-err! msg)
   (err! msg)
@@ -31,6 +35,12 @@
    ((literal? expr) (literal-value expr))
    ((grouping? expr)
     (evaluate (grouping-expression expr)))
+   ((variable? expr)
+    (let ((tok (variable-name expr)))
+      (if (hash-table-exists? global-env (token-lexeme tok))
+        (hash-table-ref global-env (token-lexeme tok))
+        (runtime-err! (format "~Unbound variable ~A at line ~A"
+                              (token-lexeme tok) (token-line tok))))))
    ((unary? expr)
     (let ((right (evaluate (unary-right expr)))
           (op (token-type (unary-operator expr))))
@@ -79,7 +89,19 @@
 (define (execute stmt)
   (cond
    ((print-stmt? stmt)
-    (print (evaluate (print-stmt-value stmt)))
+    (let ((res (evaluate (print-stmt-value stmt))))
+      (print (cond
+               ((null? res) "nil")
+               ((eq? res #f) "false")
+               ((eq? res #t) "true")
+               (else res)))
+      '()))
+   ((var-stmt? stmt)
+    (let ((value
+            (if (null? (var-stmt-init stmt))
+              '()
+              (evaluate (var-stmt-init stmt)))))
+      (hash-table-set! global-env (token-lexeme (var-stmt-name stmt)) value))
     '())
    (else (runtime-err! (format "Unknown stmt ~A" stmt)))))
 

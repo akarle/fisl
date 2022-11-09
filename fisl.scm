@@ -50,7 +50,6 @@
     (cond
       ((eq? argc 0)
        (thread-start! (lambda () (run-prompt) (exit 0)))
-       (print "starting the repl")
        (nrepl 1234))
       ((eq? argc 1) (run-file (car args)))
       (else (die "Too many arguments. Usage: fisl [FILE]")))))

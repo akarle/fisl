@@ -21,16 +21,13 @@
    (else (equal? a b))))
 
 (define (assert-num op x)
-  ;; TODO: use call/cc to not abort the process
   (or (number? x) (runtime-err! (format "Operand must be a number ~A ~A" op x))))
 
 (define (assert-nums op x y)
-  ;; TODO: use call/cc to not abort the process
   (or (and (number? x) (number? y))
       (runtime-err! (format "Operands must be numbers ~A ~A ~A" x op y))))
 
 (define (evaluate expr)
-  ;; TODO: put these on the types themselves? like methods
   (cond
    ((literal? expr) (literal-value expr))
    ((grouping? expr)

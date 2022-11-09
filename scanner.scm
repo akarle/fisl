@@ -42,15 +42,15 @@
 
 (define (scan src)
   (define (peek i)
-					; safe string-ref
+    ;; safe string-ref
     (if (< i (string-length src))
         (string-ref src i)
         #f))
 
   (define (get-tokens s i line in)
-					; Gets all tokens after 'start', tracks state in i (current char), line, in
+    ;; Gets all tokens after 'start', tracks state in i (current char), line, in
     (define (tok-range type s2 i2)
-					; Helper to make a token, cons it to our list, and recurse with fresh state
+      ;; Helper to make a token, cons it to our list, and recurse with fresh state
       (let ((text (substring src s2 (add1 i2))))
         (let ((tok (cond
                     ((eq? type 'STRING) (make-token type text (substring src (add1 s2) i2) line))
@@ -64,15 +64,15 @@
           (cons tok (get-tokens (add1 i2) (add1 i2) line #f)))))
 
     (define (tok type)
-					; helper to tokenize current span
+      ;; helper to tokenize current span
       (tok-range type s i))
 
     (define (skip . line2)
-					; Helper to skip this character range
+      ;; Helper to skip this character range
       (get-tokens (add1 i) (add1 i) (optional line2 line) in))
 
     (define (advance . line2)
-					; Helper to iterate; keeps start but increments range
+      ;; Helper to iterate; keeps start but increments range
       (get-tokens s (add1 i) (optional line2 line) in))
 
     (let ((c (peek i)) (n (peek (add1 i))))

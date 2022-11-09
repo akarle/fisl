@@ -94,15 +94,18 @@
         (else (runtime-err! (format "Unknown bin op ~A" op))))))
    (else (runtime-err! (format "Unknown expr type ~A" expr)))))
 
+(define (lox-print val)
+  (print (cond
+           ((null? val) "nil")
+           ((eq? val #f) "false")
+           ((eq? val #t) "true")
+           (else val))))
+
 (define (execute stmt)
   (cond
    ((print-stmt? stmt)
     (let ((res (evaluate (print-stmt-value stmt))))
-      (print (cond
-               ((null? res) "nil")
-               ((eq? res #f) "false")
-               ((eq? res #t) "true")
-               (else res)))
+      (lox-print res)
       '()))
    ((var-stmt? stmt)
     (let ((value
@@ -111,6 +114,10 @@
               (evaluate (var-stmt-init stmt)))))
       (hash-table-set! global-env (token-lexeme (var-stmt-name stmt)) value))
     '())
+   ((expr-stmt? stmt)
+    (let ((res (evaluate (expr-stmt-value stmt))))
+      (if in-repl (lox-print res))
+      '()))
    (else (runtime-err! (format "Unknown stmt ~A" stmt)))))
 
 (define (interpret stmts)

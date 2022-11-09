@@ -12,6 +12,8 @@
 (include "parser.scm")
 (include "interpreter.scm")
 
+(define in-repl #f)
+
 (define (run code)
   (let ((tokens (scan code)))
     (if tokens
@@ -49,6 +51,7 @@
   (let ((argc (length args)))
     (cond
       ((eq? argc 0)
+       (set! in-repl #t)
        (thread-start! (lambda () (run-prompt) (exit 0)))
        (nrepl 1234))
       ((eq? argc 1) (run-file (car args)))

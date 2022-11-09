@@ -87,7 +87,9 @@
   (let-values (((expr toks) (parse-expression '() tokens)))
     (if (top-type? toks '(SEMICOLON))
       (values (maker expr) (cdr toks))
-      (parse-err! (car toks) "expected ;"))))
+      (if in-repl
+        (values (maker expr) toks)
+        (parse-err! (car toks) "expected ;")))))
 
 (define (parse-print-statement tokens)
   (parse-generic-stmt tokens make-print-stmt))

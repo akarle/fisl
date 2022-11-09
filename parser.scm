@@ -3,188 +3,174 @@
 
 (define parser-abort #f)
 
+
+;; EXPRESSIONS
 (define-record binary left operator right)
-(set-record-printer! binary
-		     (lambda (x out) (fprintf out "(~A ~S ~S)"
-					      (token-lexeme (binary-operator x))
-					      (binary-left x)
-					      (binary-right x))))
-
 (define-record grouping expression)
-(set-record-printer! grouping
-		     (lambda (x out) (fprintf out "(group ~S)" (grouping-expression x))))
-
 (define-record literal value)
-(set-record-printer! literal
-		     (lambda (x out) (fprintf out "~S" (literal-value x))))
-
 (define-record unary operator right)
-(set-record-printer! unary
-		     (lambda (x out) (fprintf out "(~A ~S)"
-					      (token-lexeme (unary-operator x))
-					      (unary-right x))))
-
 (define-record variable name)
-(set-record-printer! variable
-		     (lambda (x out) (fprintf out "~A" (token-lexeme (variable-name x)))))
-
 (define-record assignment name value)
+
+(set-record-printer! binary
+  (lambda (x out) (fprintf out "(~A ~S ~S)"
+                           (token-lexeme (binary-operator x))
+                           (binary-left x)
+                           (binary-right x))))
+
+(set-record-printer! grouping
+  (lambda (x out) (fprintf out "(group ~S)" (grouping-expression x))))
+
+(set-record-printer! literal
+  (lambda (x out) (fprintf out "~S" (literal-value x))))
+
+(set-record-printer! unary
+  (lambda (x out) (fprintf out "(~A ~S)"
+                           (token-lexeme (unary-operator x))
+                           (unary-right x))))
+
+(set-record-printer! variable
+  (lambda (x out) (fprintf out "~A" (token-lexeme (variable-name x)))))
+
 (set-record-printer! assignment
-		     (lambda (x out) (fprintf out "(set! ~A ~A)" (token-lexeme (assignment-name x)) (assignment-value x))))
+  (lambda (x out) (fprintf out "(set! ~A ~A)" (token-lexeme (assignment-name x)) (assignment-value x))))
 
 
 
+;; STATEMENTS
 (define-record print-stmt value)
+(define-record expr-stmt value)
+(define-record var-stmt name init)
+
 (set-record-printer! print-stmt
 		     (lambda (x out)
 		       (fprintf out "(print ~A)" (print-stmt-value x))))
 
-(define-record expr-stmt value)
 (set-record-printer! expr-stmt
 		     (lambda (x out)
 		       (fprintf out "(expr ~A)" (expr-stmt-value x))))
 
-(define-record var-stmt name init)
 (set-record-printer! var-stmt
 		     (lambda (x out)
 		       (fprintf out "(var ~A ~A)" (var-stmt-name x) (var-stmt-init x))))
 
 
+;; helper to check if first is of types
 (define (top-type? tokens types)
   (memq (token-type (car tokens)) types))
 
-(define (parse tokens fname)
-  (define (panic tok msg)
-    (if (eq? (token-type tok) 'EOF)
-        (err! (format "~A:~A:~A ~A" fname (token-line tok) "Error at end." msg))
-        (err! (format "~A:~A:~A ~A. ~A"
-                      fname
-                      (token-line tok)
-                      "Error at"
-                      (token-lexeme tok)
-                      msg)))
-    ;; TODO: synchronize instead of abort
-    (parser-abort #f))
 
-  (define (declaration tokens)
-    (if (top-type? tokens '(VAR))
-	;; TODO: sync on failure
-	(var-decl (cdr tokens))
-	(statement tokens)))
+(define (parse-declaration tokens)
+  (if (top-type? tokens '(VAR))
+      ;; TODO: sync on failure
+      (parse-var-decl (cdr tokens))
+      (parse-statement tokens)))
 
-  (define (var-decl tokens)
-    (if (top-type? tokens '(IDENTIFIER))
-	(let* ((ret
-	       (if (top-type? (cdr tokens) '(EQUAL))
-		   (expression '() (cddr tokens))
-		   (cons '() (cdr tokens))))
-	       (init (car ret))
-	       (toks (cdr ret)))
-	  (if (top-type? toks '(SEMICOLON))
-	      (cons (make-var-stmt (car tokens) init)
-		    (cdr toks))
-	      (panic (car toks) "Expected ';' after variable declaration")))
-	(panic (car tokens) "expected variable name")))
+(define (parse-var-decl tokens)
+  (if (top-type? tokens '(IDENTIFIER))
+      (let-values (((init toks)
+                    (if (top-type? (cdr tokens) '(EQUAL))
+                      (parse-expression '() (cddr tokens))
+                      (values '() (cdr tokens)))))
+        (if (top-type? toks '(SEMICOLON))
+            (values (make-var-stmt (car tokens) init) (cdr toks))
+            (parse-err! (car toks) "Expected ';' after variable declaration")))
+      (parse-err! (car tokens) "expected variable name")))
 
-  (define (statement tokens)
-    (if (top-type? tokens '(PRINT))
-	(print-statement (cdr tokens))
-	(expression-statement tokens)))
+(define (parse-statement tokens)
+  (if (top-type? tokens '(PRINT))
+      (parse-print-statement (cdr tokens))
+      (parse-expression-statement tokens)))
 
-  (define (print-statement tokens)
-    (let ((ret (expression '() tokens)))
-      (let ((expr (car ret)) (toks (cdr ret)))
-	(if (top-type? toks '(SEMICOLON))
-	    (cons (make-print-stmt expr) (cdr toks))
-	    (panic (car toks) "expected ;")))))
+;; Used for print and expr statements, which have the same formula
+(define (parse-generic-stmt tokens maker)
+  (let-values (((expr toks) (parse-expression '() tokens)))
+    (if (top-type? toks '(SEMICOLON))
+      (values (maker expr) (cdr toks))
+      (parse-err! (car toks) "expected ;"))))
 
-  (define (expression-statement tokens)
-    (let ((ret (expression '() tokens)))
-      (let ((expr (car ret)) (toks (cdr ret)))
-	(if (top-type? toks '(SEMICOLON))
-	    (cons (make-expr-stmt expr) (cdr toks))
-	    (panic (car toks) "expected ;")))))
+(define (parse-print-statement tokens)
+  (parse-generic-stmt tokens make-print-stmt))
 
-  (define (expression expr toks)
-    (assignment expr toks))
+(define (parse-expression-statement tokens)
+  (parse-generic-stmt tokens make-expr-stmt))
 
-  (define (assignment expr toks)
-    (let* ((ret (equality expr toks))
-           (e2 (car ret))
-           (t2 (cdr ret)))
-      (if (top-type? t2 '(EQUAL))
-        (let* ((ret2 (assignment e2 (cdr t2)))
-               (e3 (car ret2))
-               (t3 (cdr ret2)))
-          (if (variable? e2)
-            (cons (make-assignment (variable-name e2) e3) t3)
-            (begin (err! "Invalid assignment target") (cons e2 t3))))
-        (cons e2 t2))))
+(define (parse-assignment expr toks)
+  (let-values (((e2 t2) (parse-equality expr toks)))
+    (if (top-type? t2 '(EQUAL))
+      (let-values (((e3 t3) (parse-assignment e2 (cdr t2))))
+        (if (variable? e2)
+          (values (make-assignment (variable-name e2) e3) t3)
+          (begin (err! "Invalid parse-assignment target") (values e2 t3))))
+      (values e2 t2))))
 
-  (define (equality expr toks)
-    ;; (print (format "equality ~S ~S" expr toks))
-    (let ((ret (comparison expr toks)))
-      (let loop ((e (car ret)) (ts (cdr ret)))
-        (if (top-type? ts '(BANG_EQUAL EQUAL_EQUAL))
-            (let ((ret2 (comparison e (cdr ts))))
-              (loop (make-binary e (car ts) (car ret2)) (cdr ret2)))
-            (cons e ts)))))
+(define (parse-expression expr toks)
+  (parse-assignment expr toks))
 
-  (define (comparison expr toks)
-    ;; (print (format "comparison ~S ~S" expr toks))
-    (let ((ret (term expr toks)))
-      (let loop ((e (car ret)) (ts (cdr ret)))
-        (if (top-type? ts '(GREATER GREATER_EQUAL LESS LESS_EQUAL))
-            (let ((ret2 (term e (cdr ts))))
-              (loop (make-binary e (car ts) (car ret2)) (cdr ret2)))
-            (cons e ts)))))
+;; Most of the binary operators have the same pattern:
+;;   1. Evaluate the left side of the expression
+;;   2. While the top is the operator, keep evaluating / building up the expression
+;;   3. Return once the operator isn't matched
+;; This function does it all, with a generic 'lower' to evaluate if 'types' matched
+(define (parse-generic-binary expr tokens lower types)
+  (let-values (((e2 t2) (lower expr tokens)))
+    (let loop ((e e2) (ts t2))
+      (if (top-type? ts types)
+        ;; top of ts is an operator, eval right side on rest
+        (let-values (((e3 t3) (lower e (cdr ts))))
+          (loop (make-binary e (car ts) e3) t3))
+        (values e ts)))))
 
-  (define (term expr toks)
-    ;; (print (format "term ~S ~S" expr toks))
-    (let ((ret (factor expr toks)))
-      (let loop ((e (car ret)) (ts (cdr ret)))
-        (if (top-type? ts '(MINUS PLUS))
-            (let ((ret2 (factor e (cdr ts))))
-              (loop (make-binary e (car ts) (car ret2)) (cdr ret2)))
-            (cons e ts)))))
+(define (parse-equality expr toks)
+  (parse-generic-binary expr toks parse-comparison '(BANG_EQUAL EQUAL_EQUAL)))
 
-  (define (factor expr toks)
-    ;; (print (format "factor ~S ~S" expr toks))
-    (let ((ret (unary expr toks)))
-      (let loop ((e (car ret)) (ts (cdr ret)))
-        (if (top-type? ts '(SLASH STAR))
-            (let ((ret2 (unary e (cdr ts))))
-              (loop (make-binary e (car ts) (car ret2)) (cdr ret2)))
-            (cons e ts)))))
+(define (parse-comparison expr toks)
+  (parse-generic-binary expr toks parse-term '(GREATER GREATER_EQUAL LESS LESS_EQUAL)))
 
-  (define (unary expr toks)
-    ;; (print (format "unary ~S ~S" expr toks))
-    (if (top-type? toks '(BANG MINUS))
-        (let ((ret (unary expr (cdr toks))))
-          (cons (make-unary (car toks) (car ret)) (cdr ret)))
-        (primary expr toks)))
+(define (parse-term expr toks)
+  (parse-generic-binary expr toks parse-factor '(MINUS PLUS)))
 
-  (define (primary expr toks)
-    ;; (print (format "primary ~S ~S" expr toks))
+(define (parse-factor expr toks)
+  (parse-generic-binary expr toks parse-unary '(SLASH STAR)))
+
+(define (parse-unary expr toks)
+  (if (top-type? toks '(BANG MINUS))
+      (let-values (((e2 t2) (parse-unary expr (cdr toks))))
+        (values (make-unary (car toks) e2) t2))
+      (parse-primary expr toks)))
+
+(define (parse-primary expr toks)
+  (let ((top (car toks)) (rest (cdr toks)))
     (cond
-     ((top-type? toks '(FALSE)) (cons (make-literal #f) (cdr toks)))
-     ((top-type? toks '(TRUE)) (cons (make-literal #t) (cdr toks)))
-     ((top-type? toks '(NIL)) (cons (make-literal '()) (cdr toks)))
+     ((top-type? toks '(FALSE)) (values (make-literal #f) rest))
+     ((top-type? toks '(TRUE)) (values (make-literal #t) rest))
+     ((top-type? toks '(NIL)) (values (make-literal '()) rest))
      ((top-type? toks '(NUMBER STRING))
-      (cons (make-literal (token-literal (car toks))) (cdr toks)))
-     ((top-type? toks '(IDENTIFIER)) (cons (make-variable (car toks)) (cdr toks)))
+      (values (make-literal (token-literal top)) rest))
+     ((top-type? toks '(IDENTIFIER)) (values (make-variable top) rest))
      ((top-type? toks '(LEFT_PAREN))
-      (let ((ret (expression expr (cdr toks))))
-        (if (eq? (token-type (cadr ret)) 'RIGHT_PAREN)
-            (cons (make-grouping (car ret)) (cddr ret))
-            (panic (cadr ret) "Expected ')'"))))
-     (else (panic (car toks) "Unknown token"))))
+      (let-values (((e2 t2) (parse-expression expr rest)))
+        (if (top-type? t2 '(RIGHT_PAREN))
+            (values (make-grouping e2) (cdr t2))
+            (parse-err! (car t2) "Expected ')'"))))
+     (else (parse-err! (car toks) "Unknown token")))))
 
-  ;; Actual body of parse!
+(define (parse-err! tok msg)
+  (if (eq? (token-type tok) 'EOF)
+      (fname-err! (format "~A:~A ~A" (token-line tok) "Error at end." msg))
+      (fname-err! (format "~A:~A ~A. ~A"
+                    (token-line tok)
+                    "Error at"
+                    (token-lexeme tok)
+                    msg)))
+  ;; TODO: synchronize instead of abort
+  (parser-abort #f))
+
+(define (parse tokens)
   (call/cc (lambda (cc)
 	     (set! parser-abort cc)
 	     (let loop ((toks tokens))
 	       (if (not (top-type? toks '(EOF)))
-		   (let ((ret (declaration toks)))
-		     (cons (car ret) (loop (cdr ret))))
+		   (let-values (((expr rest) (parse-declaration toks)))
+		     (cons expr (loop rest)))
 		   '())))))

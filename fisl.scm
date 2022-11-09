@@ -12,10 +12,10 @@
 (include "parser.scm")
 (include "interpreter.scm")
 
-(define (run code fname)
-  (let ((tokens (scan code fname)))
+(define (run code)
+  (let ((tokens (scan code)))
     (if tokens
-	(let ((stmts (parse tokens fname)))
+	(let ((stmts (parse tokens)))
 	  (if stmts
 	      (interpret stmts))))))
 
@@ -35,13 +35,14 @@
     (let ((l (read-line)))
       (if (not (or (eof-object? l) (equal? l ",q")))
         (begin
-          (run l "repl")
+          (run l)
           (clear-err!)
           (run-prompt))))))
 
 (define (run-file fname)
+  (set-fname! fname)
   (call-with-input-file fname (lambda (p)
-    (run (read-string #f p) fname)
+    (run (read-string #f p))
     (exit (if had-err 1 0)))))
 
 (define (main args)

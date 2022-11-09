@@ -40,7 +40,7 @@
 (define (alnum? c)
   (and c (or (alpha? c) (digit? c))))
 
-(define (scan src fname)
+(define (scan src)
   (define (peek i)
 					; safe string-ref
     (if (< i (string-length src))
@@ -84,7 +84,7 @@
                                   (advance)))
            ((eq? in 'string)
             (cond
-             ((not c) (err! (format "~A:~A:unterminated string" fname line)))
+             ((not c) (fname-err! (format "~A:unterminated string" line)))
              ((eq? #\" c) (tok 'STRING))
              ((eq? #\newline c) (advance (add1 line)))
              (else (advance))))
@@ -123,6 +123,6 @@
                   ((eq? #\space c) (skip))
                   ((eq? #\tab c) (skip))
                   ((eq? #\newline c) (skip (add1 line)))
-                  (else (err! (format "~A:~A:unexpected character: ~A" fname line c)) (skip))))))))
+                  (else (fname-err! (format "~A:unexpected character: ~A" line c)) (skip))))))))
 
   (get-tokens 0 0 1 #f))

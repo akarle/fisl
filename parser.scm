@@ -1,7 +1,7 @@
 ;; parser.scm -- parser routines
 (import (chicken format))
 
-(define parser-abort #f)
+(define parser-sync #f)
 
 
 ;; EXPRESSIONS
@@ -62,7 +62,6 @@
 
 (define (parse-declaration tokens)
   (if (top-type? tokens '(VAR))
-      ;; TODO: sync on failure
       (parse-var-decl (cdr tokens))
       (parse-statement tokens)))
 
@@ -74,8 +73,8 @@
                       (values '() (cdr tokens)))))
         (if (top-type? toks '(SEMICOLON))
             (values (make-var-stmt (car tokens) init) (cdr toks))
-            (parse-err! (car toks) "Expected ';' after variable declaration")))
-      (parse-err! (car tokens) "expected variable name")))
+            (parse-err! toks "Expected ';' after variable declaration")))
+      (parse-err! tokens "expected variable name")))
 
 (define (parse-statement tokens)
   (if (top-type? tokens '(PRINT))
@@ -89,7 +88,7 @@
       (values (maker expr) (cdr toks))
       (if in-repl
         (values (maker expr) toks)
-        (parse-err! (car toks) "expected ;")))))
+        (parse-err! toks "expected ;")))))
 
 (define (parse-print-statement tokens)
   (parse-generic-stmt tokens make-print-stmt))
@@ -154,25 +153,35 @@
       (let-values (((e2 t2) (parse-expression expr rest)))
         (if (top-type? t2 '(RIGHT_PAREN))
             (values (make-grouping e2) (cdr t2))
-            (parse-err! (car t2) "Expected ')'"))))
-     (else (parse-err! (car toks) "Unknown token")))))
+            (parse-err! t2 "Expected ')'"))))
+     (else (parse-err! toks "Unknown token")))))
 
-(define (parse-err! tok msg)
-  (if (eq? (token-type tok) 'EOF)
-      (fname-err! (format "~A:~A ~A" (token-line tok) "Error at end." msg))
+(define (parse-err! toks msg)
+  (let ((top (car toks)))
+    (if (top-type? toks '(EOF))
+      (fname-err! (format "~A:~A ~A" (token-line top) "Error at end." msg))
       (fname-err! (format "~A:~A ~A. ~A"
-                    (token-line tok)
-                    "Error at"
-                    (token-lexeme tok)
-                    msg)))
-  ;; TODO: synchronize instead of abort
-  (parser-abort #f))
+                          (token-line top)
+                          "Error at"
+                          (token-lexeme top)
+                          msg)))
+    (let ((t2 (synchronize (cdr toks))))
+      (parser-sync t2))))
+
+;; Given a list of tokens, returns the next statement (best guess based
+;; on keyword being a statement keyword OR seeing a semicolon)
+(define (synchronize tokens)
+  (cond
+    ((null? tokens) '())
+    ((top-type? tokens '(SEMICOLON)) (cdr tokens))
+    ((top-type? tokens '(CLASS FUN VAR FOR IF WHILE PRINT RETURN)) tokens)
+    (else (synchronize (cdr tokens)))))
 
 (define (parse tokens)
-  (call/cc (lambda (cc)
-	     (set! parser-abort cc)
-	     (let loop ((toks tokens))
-	       (if (not (top-type? toks '(EOF)))
-		   (let-values (((expr rest) (parse-declaration toks)))
-		     (cons expr (loop rest)))
-		   '())))))
+  ;; Loop through declarations, starting with tokens BUT using call/cc
+  ;; to bookmark the loop so we can synchronize on parse-err!
+  (let loop ((toks (call/cc (lambda (cc) (set! parser-sync cc) tokens))))
+    (if (and toks (not (top-type? toks '(EOF))))
+      (let-values (((expr rest) (parse-declaration toks)))
+        (cons expr (loop rest)))
+      '())))

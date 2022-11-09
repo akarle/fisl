@@ -18,8 +18,9 @@
   (let ((tokens (scan code)))
     (if tokens
 	(let ((stmts (parse tokens)))
-	  (if stmts
-	      (interpret stmts))))))
+          (unless had-err
+            (if stmts
+              (interpret stmts)))))))
 
 (define (prompt)
   ;; HACK: srfi-18 blocks for IO, so having run-prompt

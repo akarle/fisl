@@ -181,7 +181,7 @@
   ;; Loop through declarations, starting with tokens BUT using call/cc
   ;; to bookmark the loop so we can synchronize on parse-err!
   (let loop ((toks (call/cc (lambda (cc) (set! parser-sync cc) tokens))))
-    (if (and toks (not (top-type? toks '(EOF))))
+    (if (and (not (null? toks)) (not (top-type? toks '(EOF))))
       (let-values (((expr rest) (parse-declaration toks)))
         (cons expr (loop rest)))
       '())))

@@ -41,18 +41,24 @@
 (define-record print-stmt value)
 (define-record expr-stmt value)
 (define-record var-stmt name init)
+(define-record block stmts)
 
 (set-record-printer! print-stmt
-		     (lambda (x out)
-		       (fprintf out "(print ~A)" (print-stmt-value x))))
+  (lambda (x out)
+    (fprintf out "(print ~A)" (print-stmt-value x))))
 
 (set-record-printer! expr-stmt
-		     (lambda (x out)
-		       (fprintf out "(expr ~A)" (expr-stmt-value x))))
+  (lambda (x out)
+    (fprintf out "(expr ~A)" (expr-stmt-value x))))
 
 (set-record-printer! var-stmt
-		     (lambda (x out)
-		       (fprintf out "(var ~A ~A)" (var-stmt-name x) (var-stmt-init x))))
+  (lambda (x out)
+    (fprintf out "(var ~A ~A)" (var-stmt-name x) (var-stmt-init x))))
+
+(set-record-printer! block
+  (lambda (x out)
+    (fprintf out "(block ~A)" (block-stmts x))))
+
 
 
 ;; helper to check if first is of types
@@ -77,9 +83,14 @@
       (parse-err! tokens "expected variable name")))
 
 (define (parse-statement tokens)
-  (if (top-type? tokens '(PRINT))
-      (parse-print-statement (cdr tokens))
-      (parse-expression-statement tokens)))
+  (cond ((top-type? tokens '(PRINT))
+	 (parse-print-statement (cdr tokens)))
+	((top-type? tokens '(LEFT_BRACE))
+	 (let-values (((stmts toks) (parse-block (cdr tokens))))
+	   ;; TODO: return the block record instead of stmts? Not the
+	   ;; way the book does it but seems cleaner :thinking:
+	   (values (make-block stmts) toks)))
+	(else (parse-expression-statement tokens))))
 
 ;; Used for print and expr statements, which have the same formula
 (define (parse-generic-stmt tokens maker)
@@ -95,6 +106,18 @@
 
 (define (parse-expression-statement tokens)
   (parse-generic-stmt tokens make-expr-stmt))
+
+(define (parse-block tokens)
+  (let loop ((stmts '()) (toks tokens))
+    (if (top-type? toks '(RIGHT_BRACE))
+	(values stmts (cdr toks))
+	(if (top-type? toks '(EOF))
+	    (parse-err! toks "expected '}' after block")
+	    (let-values (((decl rest) (parse-declaration toks)))
+	      ;; TODO: can we do this with cons instead of append?
+	      ;; I don't think so, given that we'd need to (cons decl (loop ...))
+	      ;; but (loop) returns multiple values (sigh)
+	      (loop (append stmts (list decl)) rest))))))
 
 (define (parse-assignment expr toks)
   (let-values (((e2 t2) (parse-equality expr toks)))

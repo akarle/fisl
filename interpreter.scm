@@ -5,7 +5,36 @@
 
 (define interpreter-abort #f)
 
-(define global-env (make-hash-table))
+(define global-env (make-env #f))
+
+(define (make-env parent)
+  (let ((ht (make-hash-table)))
+    (lambda (action)
+      (cond ((eq? action 'get)
+	     (lambda (el)
+	       (if (hash-table-exists? ht el)
+		   (hash-table-ref ht el)
+		   (if parent
+		       (env-get parent el)
+		       (runtime-err! (format "Unbound variable ~A" el))))))
+	    ((eq? action 'set)
+	     (lambda (el val)
+	       (hash-table-set! ht el val)))
+	    ((eq? action 'exists)
+	     (lambda (el)
+	       (if (hash-table-exists? ht el)
+		   #t
+		   (and parent (env-exists? parent el)))))
+	    (else (error (format "Unknown action for env -- ~A" action)))))))
+
+(define (env-get env key)
+  ((env 'get) key))
+
+(define (env-set! env key val)
+  ((env 'set) key val))
+
+(define (env-exists? env key)
+  ((env 'exists) key))
 
 (define (runtime-err! msg)
   (err! msg)
@@ -34,15 +63,12 @@
     (evaluate (grouping-expression expr)))
    ((variable? expr)
     (let ((tok (variable-name expr)))
-      (if (hash-table-exists? global-env (token-lexeme tok))
-        (hash-table-ref global-env (token-lexeme tok))
-        (runtime-err! (format "~Unbound variable ~A at line ~A"
-                              (token-lexeme tok) (token-line tok))))))
+      (env-get global-env (token-lexeme tok))))
    ((assignment? expr)
     (let ((tok (assignment-name expr)))
-      (if (hash-table-exists? global-env (token-lexeme tok))
+      (if (env-exists? global-env (token-lexeme tok))
         (let ((res (evaluate (assignment-value expr))))
-          (hash-table-set! global-env (token-lexeme tok) res)
+          (env-set! global-env (token-lexeme tok) res)
           res)
         (runtime-err! (format "Unbound variable ~A at line ~A"
                               (token-lexeme tok) (token-line tok))))))
@@ -109,7 +135,7 @@
             (if (null? (var-stmt-init stmt))
               '()
               (evaluate (var-stmt-init stmt)))))
-      (hash-table-set! global-env (token-lexeme (var-stmt-name stmt)) value))
+      (env-set! global-env (token-lexeme (var-stmt-name stmt)) value))
     '())
    ((expr-stmt? stmt)
     (let ((res (evaluate (expr-stmt-value stmt))))

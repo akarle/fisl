@@ -79,6 +79,18 @@
          (assert-num op right)
          (- right))
         (else (runtime-err! (format "Unknown unary op ~A" op))))))
+   ((logical? expr)
+    (let ((left (evaluate (logical-left expr) env))
+          (op (token-type (logical-operator expr))))
+      (case op
+	((OR)
+	 (if (truthy? left)
+	     left
+	     (evaluate (logical-right expr) env)))
+	((AND)
+	 (if (truthy? left)
+	     (evaluate (logical-right expr) env)
+	     left)))))
    ((binary? expr)
     (let ((left (evaluate (binary-left expr) env))
           (right (evaluate (binary-right expr) env))

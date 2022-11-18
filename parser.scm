@@ -11,6 +11,7 @@
 (define-record unary operator right)
 (define-record variable name)
 (define-record assignment name value)
+(define-record logical left operator right)
 
 (set-record-printer! binary
   (lambda (x out) (fprintf out "(~A ~S ~S)"
@@ -35,6 +36,11 @@
 (set-record-printer! assignment
   (lambda (x out) (fprintf out "(set! ~A ~A)" (token-lexeme (assignment-name x)) (assignment-value x))))
 
+(set-record-printer! logical
+  (lambda (x out) (fprintf out "(~A ~A ~A)"
+		    (token-lexeme (logical-operator x))
+		    (logical-left x)
+		    (logical-right x))))
 
 
 ;; STATEMENTS
@@ -141,7 +147,7 @@
 		  (values (make-if-stmt cond-expr then-stmt '()) toks2)))))))
 
 (define (parse-assignment expr toks)
-  (let-values (((e2 t2) (parse-equality expr toks)))
+  (let-values (((e2 t2) (parse-or expr toks)))
     (if (top-type? t2 '(EQUAL))
       (let-values (((e3 t3) (parse-assignment e2 (cdr t2))))
         (if (variable? e2)
@@ -157,14 +163,17 @@
 ;;   2. While the top is the operator, keep evaluating / building up the expression
 ;;   3. Return once the operator isn't matched
 ;; This function does it all, with a generic 'lower' to evaluate if 'types' matched
-(define (parse-generic-binary expr tokens lower types)
+(define (parse-generic maker expr tokens lower types)
   (let-values (((e2 t2) (lower expr tokens)))
     (let loop ((e e2) (ts t2))
       (if (top-type? ts types)
         ;; top of ts is an operator, eval right side on rest
         (let-values (((e3 t3) (lower e (cdr ts))))
-          (loop (make-binary e (car ts) e3) t3))
+          (loop (maker e (car ts) e3) t3))
         (values e ts)))))
+
+(define (parse-generic-binary expr tokens lower types)
+  (parse-generic make-binary expr tokens lower types))
 
 (define (parse-equality expr toks)
   (parse-generic-binary expr toks parse-comparison '(BANG_EQUAL EQUAL_EQUAL)))
@@ -177,6 +186,15 @@
 
 (define (parse-factor expr toks)
   (parse-generic-binary expr toks parse-unary '(SLASH STAR)))
+
+(define (parse-generic-logical expr tokens lower types)
+  (parse-generic make-logical expr tokens lower types))
+
+(define (parse-or expr toks)
+  (parse-generic-logical expr toks parse-and '(OR)))
+
+(define (parse-and expr toks)
+  (parse-generic-logical expr toks parse-equality '(AND)))
 
 (define (parse-unary expr toks)
   (if (top-type? toks '(BANG MINUS))

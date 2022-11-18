@@ -15,9 +15,17 @@
 		   (if parent
 		       (env-get parent el)
 		       (runtime-err! (format "Unbound variable ~A" el))))))
-	    ((eq? action 'set)
+	    ((eq? action 'def)
+	     ;; var block, sets in current env
 	     (lambda (el val)
 	       (hash-table-set! ht el val)))
+	    ((eq? action 'set)
+	     (lambda (el val)
+	       (if (hash-table-exists? ht el)
+		   (hash-table-set! ht el val)
+		   (if parent
+		       (env-set! parent el val)
+		       (runtime-err! (format "Unable to set unbound variable ~A" el))))))
 	    ((eq? action 'exists)
 	     (lambda (el)
 	       (if (hash-table-exists? ht el)
@@ -30,6 +38,9 @@
 
 (define (env-set! env key val)
   ((env 'set) key val))
+
+(define (env-def! env key val)
+  ((env 'def) key val))
 
 (define (env-exists? env key)
   ((env 'exists) key))
@@ -145,7 +156,7 @@
             (if (null? (var-stmt-init stmt))
               '()
               (evaluate (var-stmt-init stmt) env))))
-      (env-set! env (token-lexeme (var-stmt-name stmt)) value))
+      (env-def! env (token-lexeme (var-stmt-name stmt)) value))
     '())
    ((expr-stmt? stmt)
     (let ((res (evaluate (expr-stmt-value stmt) env)))

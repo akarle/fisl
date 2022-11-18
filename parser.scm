@@ -49,6 +49,7 @@
 (define-record var-stmt name init)
 (define-record block stmts)
 (define-record if-stmt cond-expr then-stmt else-stmt)
+(define-record while-stmt cond-expr body-stmt)
 
 (set-record-printer! print-stmt
   (lambda (x out)
@@ -73,6 +74,9 @@
       (if-stmt-then-stmt x)
       (if-stmt-else-stmt x))))
 
+(set-record-printer! while-stmt
+  (lambda (x out)
+    (fprintf out "(while ~A ~A)" (while-stmt-cond-expr x) (while-stmt-body-stmt x))))
 
 ;; helper to check if first is of types
 (define (top-type? tokens types)
@@ -100,6 +104,8 @@
 	 (parse-print-statement (cdr tokens)))
 	((top-type? tokens '(IF))
 	 (parse-if-statement (cdr tokens)))
+	((top-type? tokens '(WHILE))
+	 (parse-while-statement (cdr tokens)))
 	((top-type? tokens '(LEFT_BRACE))
 	 (let-values (((stmts toks) (parse-block (cdr tokens))))
 	   ;; TODO: return the block record instead of stmts? Not the
@@ -121,6 +127,15 @@
 
 (define (parse-expression-statement tokens)
   (parse-generic-stmt tokens make-expr-stmt))
+
+(define (parse-while-statement tokens)
+  (if (not (top-type? tokens '(LEFT_PAREN)))
+      (parse-err! tokens "Expected '(' after 'while'")
+      (let-values (((cond-expr toks) (parse-expression '() (cdr tokens))))
+	(if (not (top-type? toks '(RIGHT_PAREN)))
+	    (parse-err! toks "Expected ')' after while condition")
+	    (let-values (((body-stmt toks2) (parse-statement (cdr toks))))
+	      (values (make-while-stmt cond-expr body-stmt) toks2))))))
 
 (define (parse-block tokens)
   (let loop ((stmts '()) (toks tokens))

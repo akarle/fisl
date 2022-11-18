@@ -176,6 +176,13 @@
 	(if (not (null? (if-stmt-else-stmt stmt)))
 	    (execute (if-stmt-else-stmt stmt) env)
 	    '())))
+   ((while-stmt? stmt)
+    (let loop ()
+      (if (truthy? (evaluate (while-stmt-cond-expr stmt) env))
+	  (begin
+	    (execute (while-stmt-body-stmt stmt) env)
+	    (loop))
+	  '())))
    (else (runtime-err! (format "Unknown stmt ~A" stmt)))))
 
 ;; Save the global-env outside interpret so that it persists in the REPL

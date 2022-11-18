@@ -147,13 +147,21 @@
 	    (begin
 	      (execute (car stmts) new-env)
 	      (loop (cdr stmts)))))))
+   ((if-stmt? stmt)
+    (if (truthy? (evaluate (if-stmt-cond-expr stmt) env))
+	(execute (if-stmt-then-stmt stmt) env)
+	(if (not (null? (if-stmt-else-stmt stmt)))
+	    (execute (if-stmt-else-stmt stmt) env)
+	    '())))
    (else (runtime-err! (format "Unknown stmt ~A" stmt)))))
+
+;; Save the global-env outside interpret so that it persists in the REPL
+(define global-env (make-env #f))
 
 (define (interpret stmts)
   (call/cc (lambda (cc)
 	     (set! interpreter-abort cc)
-	     (let ((global-env (make-env #f)))
-	       (let loop ((sts stmts))
-		 (if (not (null? sts))
-		     (begin (execute (car sts) global-env)
-			    (loop (cdr sts)))))))))
+	     (let loop ((sts stmts))
+	       (if (not (null? sts))
+		   (begin (execute (car sts) global-env)
+			  (loop (cdr sts))))))))

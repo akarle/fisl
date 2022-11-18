@@ -42,6 +42,7 @@
 (define-record expr-stmt value)
 (define-record var-stmt name init)
 (define-record block stmts)
+(define-record if-stmt cond-expr then-stmt else-stmt)
 
 (set-record-printer! print-stmt
   (lambda (x out)
@@ -59,6 +60,12 @@
   (lambda (x out)
     (fprintf out "(block ~A)" (block-stmts x))))
 
+(set-record-printer! if-stmt
+  (lambda (x out)
+    (fprintf out "(if ~A ~A ~A)"
+      (if-stmt-cond-expr x)
+      (if-stmt-then-stmt x)
+      (if-stmt-else-stmt x))))
 
 
 ;; helper to check if first is of types
@@ -85,6 +92,8 @@
 (define (parse-statement tokens)
   (cond ((top-type? tokens '(PRINT))
 	 (parse-print-statement (cdr tokens)))
+	((top-type? tokens '(IF))
+	 (parse-if-statement (cdr tokens)))
 	((top-type? tokens '(LEFT_BRACE))
 	 (let-values (((stmts toks) (parse-block (cdr tokens))))
 	   ;; TODO: return the block record instead of stmts? Not the
@@ -118,6 +127,18 @@
 	      ;; I don't think so, given that we'd need to (cons decl (loop ...))
 	      ;; but (loop) returns multiple values (sigh)
 	      (loop (append stmts (list decl)) rest))))))
+
+(define (parse-if-statement tokens)
+  (if (not (top-type? tokens '(LEFT_PAREN)))
+      (parse-err! tokens "Expected '(' after 'if'")
+      (let-values (((cond-expr toks) (parse-expression '() (cdr tokens))))
+	(if (not (top-type? toks '(RIGHT_PAREN)))
+	    (parse-err! toks "Expected ')' after if condition")
+	    (let-values (((then-stmt toks2) (parse-statement (cdr toks))))
+	      (if (top-type? toks2 '(ELSE))
+		  (let-values (((else-stmt toks3) (parse-statement (cdr toks2))))
+		    (values (make-if-stmt cond-expr then-stmt else-stmt) toks3))
+		  (values (make-if-stmt cond-expr then-stmt '()) toks2)))))))
 
 (define (parse-assignment expr toks)
   (let-values (((e2 t2) (parse-equality expr toks)))

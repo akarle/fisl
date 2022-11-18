@@ -102,6 +102,8 @@
 (define (parse-statement tokens)
   (cond ((top-type? tokens '(PRINT))
 	 (parse-print-statement (cdr tokens)))
+	((top-type? tokens '(FOR))
+	 (parse-for-statement (cdr tokens)))
 	((top-type? tokens '(IF))
 	 (parse-if-statement (cdr tokens)))
 	((top-type? tokens '(WHILE))
@@ -120,6 +122,7 @@
       (values (maker expr) (cdr toks))
       (if in-repl
         (values (maker expr) toks)
+	;; TODO: this might break for-loop parsing in the repl?
         (parse-err! toks "expected ;")))))
 
 (define (parse-print-statement tokens)
@@ -136,6 +139,45 @@
 	    (parse-err! toks "Expected ')' after while condition")
 	    (let-values (((body-stmt toks2) (parse-statement (cdr toks))))
 	      (values (make-while-stmt cond-expr body-stmt) toks2))))))
+
+(define (parse-for-statement tokens)
+  ;; TODO: how do we simplify this many parse-err! asserts / parse passes?
+  (if (not (top-type? tokens '(LEFT_PAREN)))
+      (parse-err! tokens "Expected '(' after 'for'")
+      (let-values (((init toks)
+		    (cond ((top-type? (cdr tokens) '(SEMICOLON))
+			   (values '() (cddr tokens)))
+			  ((top-type? (cdr tokens) '(VAR))
+			   (parse-var-decl (cddr tokens)))
+			  (else (parse-expression-statement (cdr tokens))))))
+	(let-values (((conde toks2)
+		      (cond ((top-type? toks '(SEMICOLON))
+			     (values '() toks))
+			    (else (parse-expression '() toks)))))
+	  (if (not (top-type? toks2 '(SEMICOLON)))
+	      (parse-err! toks2 "Expected ';' after loop condition")
+	      (let-values (((incr toks3)
+			    (cond ((top-type? (cdr toks2) '(RIGHT_PAREN))
+				   (values '() (cdr toks2)))
+				  (else (parse-expression '() (cdr toks2))))))
+		(if (not (top-type? toks3 '(RIGHT_PAREN)))
+		    (parse-err! toks3 "Expected ')' after for clauses")
+		    (let-values (((body toks4) (parse-statement (cdr toks3))))
+		      ;; TODO: refactor. I seem to like to "transform" variables
+		      ;; by just repeatedly let-binding new versions instead of
+		      ;; using set! --> maybe use composed functions?
+		      (let ((incr-body
+			     (if (null? incr)
+				 body
+				 (make-block (list body (make-expr-stmt incr))))))
+			(let ((cond-body
+			       (if (null? conde)
+				   (make-while-stmt (make-literal #t) incr-body)
+				   (make-while-stmt conde incr-body))))
+			  (if (null? init)
+			      (values cond-body toks4)
+			      (values (make-block (list init cond-body)) toks4))))))))))))
+
 
 (define (parse-block tokens)
   (let loop ((stmts '()) (toks tokens))
